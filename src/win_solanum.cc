@@ -3,13 +3,13 @@
 
 // Platform independent includes:
 #include <stdint.h>
+#include <stdio.h>  sprintf_s
 
 // Local includes
 #define GLEW_STATIC
 #include <GL/glew.h>
 #include <GL/wglew.h>
 #include <imgui/imgui.h>
-#include <stdio.h> // fprintf
 #pragma warning(pop)
 
 typedef int32_t bool32;
@@ -18,11 +18,7 @@ typedef uint32_t uint32;
 typedef int64_t int64;
 typedef uint64_t uint64;
 
-
-static HGLRC g_glcontext_handle;
-static GLuint g_imgui_vbo;
-static int g_imgui_vbo_size;
-static GLuint g_imgui_vao;
+#include "imgui_helpers.h"
 
 #define GLCHK(stmt) stmt; gl_query_error(#stmt, __FILE__, __LINE__)
 inline void gl_query_error(const char* expr, const char* file, int line)
@@ -65,7 +61,7 @@ inline void gl_query_error(const char* expr, const char* file, int line)
     }
 }
 
-GLuint gl_compile_shader(const char* src, GLuint type)
+static GLuint gl_compile_shader(const char* src, GLuint type)
 {
     GLuint obj = glCreateShader(type);
     GLCHK ( glShaderSource(obj, 1, &src, NULL) );
@@ -86,7 +82,8 @@ GLuint gl_compile_shader(const char* src, GLuint type)
     }
     return obj;
 }
-void gl_link_program(GLuint obj, GLuint shaders[], int64 num_shaders)
+
+static void gl_link_program(GLuint obj, GLuint shaders[], int64 num_shaders)
 {
     assert(glIsProgram(obj));
     for (int i = 0; i < num_shaders; ++i)
@@ -112,6 +109,117 @@ void gl_link_program(GLuint obj, GLuint shaders[], int64 num_shaders)
     }
     GLCHK ( glValidateProgram(obj) );
 }
+
+// Will setup an OpenGL 3.3 core profile context.
+// Loads functions with GLEW
+static void win32_setup_context(HWND window, HGLRC* context)
+{
+    int format_index = 0;
+
+    PIXELFORMATDESCRIPTOR pfd = {
+        sizeof(PIXELFORMATDESCRIPTOR),   // size of this pfd
+        1,                     // version number
+        PFD_DRAW_TO_WINDOW |   // support window
+            PFD_SUPPORT_OPENGL |   // support OpenGL
+            PFD_DOUBLEBUFFER,      // double buffered
+        PFD_TYPE_RGBA,         // RGBA type
+        32,                    // 32-bit color depth
+        0, 0, 0, 0, 0, 0,      // color bits ignored
+        0,                     // no alpha buffer
+        0,                     // shift bit ignored
+        0,                     // no accumulation buffer
+        0, 0, 0, 0,            // accum bits ignored
+        24,                    // 24-bit z-buffer
+        8,                     // 8-bit stencil buffer
+        0,                     // no auxiliary buffer
+        PFD_MAIN_PLANE,        // main layer
+        0,                     // reserved
+        0, 0, 0                // layer masks ignored
+    };
+
+    // get the best available match of pixel format for the device context
+    format_index = ChoosePixelFormat(GetDC(window), &pfd);
+
+    // make that the pixel format of the device context
+    bool32 succeeded = SetPixelFormat(GetDC(window), format_index, &pfd);
+
+    if (!succeeded)
+    {
+        OutputDebugStringA("Could not set pixel format\n");
+        PostQuitMessage(0);
+        return;
+    }
+
+    HGLRC dummy_context = wglCreateContext(GetDC(window));
+    if (!dummy_context)
+    {
+        OutputDebugStringA("Could not create GL context. Exiting");
+        PostQuitMessage(0);
+        return;
+    }
+    wglMakeCurrent(GetDC(window), dummy_context);
+    if (!succeeded)
+    {
+        OutputDebugStringA("Could not set current GL context. Exiting");
+        PostQuitMessage(0);
+        return;
+    }
+
+    GLenum glew_result = glewInit();
+    if (glew_result != GLEW_OK)
+    {
+        OutputDebugStringA("Could not init glew.\n");
+        PostQuitMessage(0);
+        return;
+    }
+    const int pixel_attribs[] =
+    {
+        WGL_ACCELERATION_ARB   , WGL_FULL_ACCELERATION_ARB           ,
+        WGL_DRAW_TO_WINDOW_ARB , GL_TRUE           ,
+        WGL_SUPPORT_OPENGL_ARB , GL_TRUE           ,
+        WGL_DOUBLE_BUFFER_ARB  , GL_TRUE           ,
+        WGL_PIXEL_TYPE_ARB     , WGL_TYPE_RGBA_ARB ,
+        WGL_COLOR_BITS_ARB     , 32                ,
+        WGL_DEPTH_BITS_ARB     , 24                ,
+        WGL_STENCIL_BITS_ARB   , 8                 ,
+        0                      ,
+    };
+    UINT num_formats = 0;
+    wglChoosePixelFormatARB(GetDC(window), pixel_attribs, NULL, 10 /*max_formats*/, &format_index, &num_formats);
+    if (!num_formats)
+    {
+        OutputDebugStringA("Could not choose pixel format. Exiting.");
+        PostQuitMessage(0);
+        return;
+    }
+
+    succeeded = false;
+    for (uint32 i = 0; i < num_formats - 1; ++i)
+    {
+        int local_index = (&format_index)[i];
+        succeeded = SetPixelFormat(GetDC(window), local_index, &pfd);
+        if (succeeded)
+            return;
+    }
+    if (!succeeded)
+    {
+        OutputDebugStringA("Could not set pixel format for final rendering context.\n");
+        PostQuitMessage(0);
+        return;
+    }
+
+    const int context_attribs[] =
+    {
+        WGL_CONTEXT_MAJOR_VERSION_ARB, 3,
+        WGL_CONTEXT_MINOR_VERSION_ARB, 3,
+        WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
+        0
+    };
+    *context = wglCreateContextAttribsARB(GetDC(window), 0/*shareContext*/,
+            context_attribs);
+    wglMakeCurrent(GetDC(window), *context);
+}
+
 LRESULT APIENTRY WndProc(
         HWND window,
         UINT message,
@@ -124,112 +232,7 @@ LRESULT APIENTRY WndProc(
     {
     case WM_CREATE:
         {
-            HDC dc = GetDC(window);
-            int format_index = 0;
-
-            PIXELFORMATDESCRIPTOR pfd = {
-                sizeof(PIXELFORMATDESCRIPTOR),   // size of this pfd
-                1,                     // version number
-                PFD_DRAW_TO_WINDOW |   // support window
-                    PFD_SUPPORT_OPENGL |   // support OpenGL
-                    PFD_DOUBLEBUFFER,      // double buffered
-                PFD_TYPE_RGBA,         // RGBA type
-                32,                    // 32-bit color depth
-                0, 0, 0, 0, 0, 0,      // color bits ignored
-                0,                     // no alpha buffer
-                0,                     // shift bit ignored
-                0,                     // no accumulation buffer
-                0, 0, 0, 0,            // accum bits ignored
-                24,                    // 24-bit z-buffer
-                8,                     // 8-bit stencil buffer
-                0,                     // no auxiliary buffer
-                PFD_MAIN_PLANE,        // main layer
-                0,                     // reserved
-                0, 0, 0                // layer masks ignored
-            };
-
-            // get the best available match of pixel format for the device context
-            format_index = ChoosePixelFormat(dc, &pfd);
-
-            // make that the pixel format of the device context
-            bool32 succeeded = SetPixelFormat(dc, format_index, &pfd);
-
-			if (!succeeded)
-			{
-				OutputDebugStringA("Could not set pixel format\n");
-				PostQuitMessage(0);
-				break;
-			}
-
-            HGLRC dummy_context = wglCreateContext(dc);
-            if (!dummy_context)
-            {
-                OutputDebugStringA("Could not create GL context. Exiting");
-                PostQuitMessage(0);
-				break;
-            }
-            wglMakeCurrent(dc, dummy_context);
-            if (!succeeded)
-            {
-                OutputDebugStringA("Could not set current GL context. Exiting");
-                PostQuitMessage(0);
-				break;
-            }
-
-            GLenum glew_result = glewInit();
-            if (glew_result != GLEW_OK)
-            {
-                OutputDebugStringA("Could not init glew.\n");
-                PostQuitMessage(0);
-				break;
-            }
-            const int pixel_attribs[] =
-            {
-                WGL_ACCELERATION_ARB   , WGL_FULL_ACCELERATION_ARB           ,
-                WGL_DRAW_TO_WINDOW_ARB , GL_TRUE           ,
-                WGL_SUPPORT_OPENGL_ARB , GL_TRUE           ,
-                WGL_DOUBLE_BUFFER_ARB  , GL_TRUE           ,
-                WGL_PIXEL_TYPE_ARB     , WGL_TYPE_RGBA_ARB ,
-                WGL_COLOR_BITS_ARB     , 32                ,
-                WGL_DEPTH_BITS_ARB     , 24                ,
-                WGL_STENCIL_BITS_ARB   , 8                 ,
-                0                      ,
-            };
-            UINT num_formats = 0;
-            wglChoosePixelFormatARB(GetDC(window), pixel_attribs, NULL, 10 /*max_formats*/, &format_index, &num_formats);
-            if (!num_formats)
-            {
-                OutputDebugStringA("Could not choose pixel format. Exiting.");
-                PostQuitMessage(0);
-				break;
-            }
-
-            succeeded = false;
-            for (uint32 i = 0; i < num_formats - 1; ++i)
-            {
-                int local_index = (&format_index)[i];
-                succeeded = SetPixelFormat(GetDC(window), local_index, &pfd);
-                if (succeeded)
-                    break;
-            }
-            if (!succeeded)
-            {
-                OutputDebugStringA("Could not set pixel format for final rendering context.\n");
-                PostQuitMessage(0);
-				break;
-            }
-
-            const int context_attribs[] =
-            {
-                WGL_CONTEXT_MAJOR_VERSION_ARB, 3,
-                WGL_CONTEXT_MINOR_VERSION_ARB, 3,
-                WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
-                0
-            };
-            g_glcontext_handle = wglCreateContextAttribsARB(GetDC(window), 0/*shareContext*/,
-                    context_attribs);
-            wglMakeCurrent(GetDC(window), g_glcontext_handle);
-
+            win32_setup_context(window, &g_glcontext_handle);
             // Init shaders for imgui
             {
                 const GLchar* vertex_shader =
@@ -261,14 +264,14 @@ LRESULT APIENTRY WndProc(
                 GLuint shader_handles[2];
                 shader_handles[0] = gl_compile_shader(vertex_shader, GL_VERTEX_SHADER);
                 shader_handles[1] = gl_compile_shader(fragment_shader, GL_FRAGMENT_SHADER);
-                GLuint program_handle = glCreateProgram();
-                gl_link_program(program_handle, shader_handles, 2);
+                g_imgui_program = glCreateProgram();
+                gl_link_program(g_imgui_program, shader_handles, 2);
 
-                GLint texture_location  = GLCHK( glGetUniformLocation(program_handle, "sampler"));
-                GLint proj_mtx_location = GLCHK( glGetUniformLocation(program_handle, "proj"));
-                GLint position_location = GLCHK( glGetAttribLocation(program_handle, "pos"));
-                GLint uv_location       = GLCHK( glGetAttribLocation(program_handle, "texcoord"));
-                GLint color_location    = GLCHK( glGetAttribLocation(program_handle, "color"));
+                GLint texture_location  = GLCHK( glGetUniformLocation(g_imgui_program, "sampler"));
+                GLint proj_mtx_location = GLCHK( glGetUniformLocation(g_imgui_program, "proj"));
+                GLint position_location = GLCHK( glGetAttribLocation(g_imgui_program, "pos"));
+                GLint uv_location       = GLCHK( glGetAttribLocation(g_imgui_program, "texcoord"));
+                GLint color_location    = GLCHK( glGetAttribLocation(g_imgui_program, "color"));
                 assert(texture_location  >= 0);
                 assert(proj_mtx_location >= 0);
                 assert(position_location >= 0);
@@ -278,7 +281,7 @@ LRESULT APIENTRY WndProc(
                 g_imgui_vbo_size = 2048;  // We will stretch it later, probably.
                 GLCHK(glGenBuffers(1, &g_imgui_vbo));
                 glBindBuffer(GL_ARRAY_BUFFER, g_imgui_vbo);
-                GLCHK(glBufferData(GL_ARRAY_BUFFER, g_imgui_vbo_size, NULL, GL_DYNAMIC_DRAW));
+                GLCHK(glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)g_imgui_vbo_size, NULL, GL_DYNAMIC_DRAW));
 
                 GLCHK(glGenVertexArrays(1, &g_imgui_vao));
                 glBindVertexArray(g_imgui_vao);
@@ -293,17 +296,71 @@ LRESULT APIENTRY WndProc(
                 GLCHK(glBindVertexArray(0));
                 GLCHK(glBindBuffer(GL_ARRAY_BUFFER, 0));
             }
+            // Init imgui
+            {
+                ImGuiIO& io = ImGui::GetIO();
+                io.DeltaTime = 1.0f / 60.0f;
+                // TODO: io.KeyMap is not set
+
+                io.RenderDrawListsFn = ImImpl_RenderDrawLists;
+                io.SetClipboardTextFn = ImImpl_SetClipboardTextFn;
+                io.GetClipboardTextFn = ImImpl_GetClipboardTextFn;
+
+                unsigned char* pixels;
+                int width, height;
+                io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
+
+                GLuint tex_id;
+                glGenTextures(1, &tex_id);
+                glBindTexture(GL_TEXTURE_2D, tex_id);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+
+                // Store our identifier
+                io.Fonts->TexID = (void *)(intptr_t)tex_id;
+            }
             break;
         }
     case WM_DESTROY:
         {
             PostQuitMessage(0);
         }
+    case WM_LBUTTONDOWN:
+        {
+            // If a mouse press event came, always pass it as "mouse held this frame", so we don't miss click-release events that are shorter than 1 frame.
+            ImGuiIO& io = ImGui::GetIO();
+            io.MouseDown[0] = true;
+            break;
+        }
+    case WM_LBUTTONUP:
+        {
+            // If a mouse press event came, always pass it as "mouse held this frame", so we don't miss click-release events that are shorter than 1 frame.
+            ImGuiIO& io = ImGui::GetIO();
+            io.MouseDown[0] = false;
+            break;
+        }
     case WM_PAINT:
         {
-            glClearColor(0,1,0,0.5);
+            glClearColor(0.5f,0.5f,0.5f,0.5);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            ImGuiIO& io = ImGui::GetIO();
+            io.DisplaySize = ImVec2(1024.0f, 560.0f);
+            // Set mouse position
+            {
+                POINT mouse;
+                GetCursorPos(&mouse);
+                ScreenToClient(window, &mouse);
+                io.MousePos = ImVec2((float)mouse.x, (float)mouse.y);
+            }
+            ImGui::NewFrame();
+            static int debug_i = 0;
+            char buffer[256];
+            sprintf_s(buffer, 256, "Hello there timer: %d\n", debug_i);
+            ImGui::Text(buffer);
+            ImGui::Render();
             SwapBuffers(GetDC(window));
+            debug_i++;
             break;
         }
 
@@ -336,8 +393,8 @@ int CALLBACK WinMain(
         return FALSE;
     }
 
-    int x = 0;
-    int y = 0;
+    int x = 100;
+    int y = 100;
     int width = 1024;
     int height = 560;
     HWND window = CreateWindowExA(
