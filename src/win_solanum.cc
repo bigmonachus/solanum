@@ -4,6 +4,9 @@
 // Platform independent includes:
 #include <GL/gl.h>
 #include <stdint.h>
+
+// Local includes
+#include <imgui/imgui.h>
 #pragma warning(pop)
 
 typedef int32_t bool32;
@@ -73,15 +76,15 @@ LRESULT APIENTRY WndProc(
         }
     case WM_PAINT:
         {
-            PAINTSTRUCT ps;
-            BeginPaint(window, &ps);
+            /* PAINTSTRUCT ps; */
+            /* BeginPaint(window, &ps); */
             // paint here
             {
                 glClearColor(0,1,0,0.5);
                 glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
                 SwapBuffers(GetDC(window));
             }
-            EndPaint(window, &ps);
+            /* EndPaint(window, &ps); */
             break;
         }
 
@@ -121,12 +124,12 @@ int CALLBACK WinMain(
     HWND window = CreateWindowExA(
             WS_EX_TOPMOST ,  // dwExStyle
             window_class.lpszClassName,     // class Name
-            "Solanum",                // window name
-            WS_VISIBLE | WS_POPUP,   // dwStyle
+            "Solanum",                      // window name
+            WS_VISIBLE | WS_POPUP,          // dwStyle
             x,                      // x
             y,                      // y
-            width,                      // width
-            height,                      // height
+            width,                  // width
+            height,                 // height
             0,                                  // parent
             0,                                  // menu
             hInstance,                          // hInstance
