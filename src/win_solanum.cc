@@ -1,16 +1,39 @@
 #include "system_includes.h"
 #include "imgui_helpers.h"
 
+#define snprintf sprintf_s
+
+// Platform services:
+void platform_alert();
+void platform_quit();
+struct TimerState;
+void platform_save_state(TimerState* state);
+
 #include "solanum.h"
 
-typedef int32_t bool32;
-typedef int32_t int32;
-typedef uint32_t uint32;
-typedef int64_t int64;
-typedef uint64_t uint64;
-
+static HGLRC g_glcontext_handle;
 static TimerState g_timer_state;
-bool g_running = true;
+bool32 g_running = true;
+bool32 g_alert_flag;
+
+void platform_quit()
+{
+    g_running = false;
+}
+
+void platform_alert()
+{
+    g_alert_flag = true;
+}
+
+void platform_save_state(TimerState* state)
+{
+    FILE* fd = fopen("solanum.dat", "wb");
+    assert(fd);
+    fwrite(&state->num_records, (size_t)(sizeof(int64)), 1, fd);
+    fwrite(state->records, sizeof(TimeRecord), (size_t)state->num_records, fd);
+    fclose(fd);
+}
 
 #define GLCHK(stmt) stmt; gl_query_error(#stmt, __FILE__, __LINE__)
 inline void gl_query_error(const char* expr, const char* file, int line)
@@ -288,7 +311,9 @@ LRESULT APIENTRY WndProc(
                     "{\n"
                     "    frag_texcoord = texcoord;\n"
                     "    frag_color = color;\n"
-                    "    gl_Position = proj * vec4(pos.xy,0,1);\n"
+                    //"    gl_Position = proj * vec4(pos.xy,0,1);\n"
+                    //"    gl_Position = proj * vec4(pos.xy + vec2(0.375, 0.375),0,1);\n"
+                    "    gl_Position = proj * vec4(pos.xy + vec2(0.5, 0.5),0,1);\n"
                     "}\n";
 
                 const GLchar* fragment_shader =
@@ -344,7 +369,7 @@ LRESULT APIENTRY WndProc(
             // Init imgui
             {
                 ImGuiIO& io = ImGui::GetIO();
-                io.DeltaTime = 1.0f / 60.0f;
+                io.DeltaTime = 1.0f / 30.0f;
                 // TODO: io.KeyMap is not set
 
                 io.RenderDrawListsFn = ImImpl_RenderDrawLists;
@@ -422,13 +447,14 @@ int CALLBACK WinMain(
 
     int x = 100;
     int y = 100;
-    int width = 1024;
-    int height = 560;
+    int width = 400;
+    int height = 500;
     HWND window = CreateWindowExA(
             0, //WS_EX_TOPMOST ,  // dwExStyle
             window_class.lpszClassName,     // class Name
             "Solanum",                      // window name
-            WS_CLIPCHILDREN | WS_CLIPSIBLINGS | WS_VISIBLE | WS_POPUP,          // dwStyle
+            //WS_CLIPCHILDREN | WS_CLIPSIBLINGS | WS_VISIBLE | WS_POPUP,          // dwStyle
+            WS_OVERLAPPEDWINDOW | WS_VISIBLE,
             x,                      // x
             y,                      // y
             width,                  // width
@@ -445,10 +471,38 @@ int CALLBACK WinMain(
     }
 
     TimerState state = {};
+    {
+        state.time_unit_in_s = 60 * 30;
+        state.records_size = 1024;
+        state.records = (TimeRecord*) malloc(state.records_size * sizeof(TimeRecord));
+        {
+            FILE* fd = fopen("solanum.dat", "rb");
+            if (fd)
+            {
+                fread(&state.num_records, (size_t)(sizeof(int64)), 1, fd);
+                fread(state.records, sizeof(TimeRecord), (size_t)state.num_records, fd);
+                fclose(fd);
+            }
+        }
+
+        time_t one_day_ago;
+        time(&one_day_ago);
+        one_day_ago -= 60 * 24;
+        for (int i = 0; i < state.num_records; ++i)
+        {
+            if (state.records[i].timestamp >= one_day_ago)
+                state.num_seconds += state.records[i].elapsed;
+        }
+    }
     state.window_width = width;
     state.window_height = height;
     while (g_running)
     {
+        if (g_alert_flag)
+        {
+            MessageBox(window, "Timer done", "Solanum", MB_OK | MB_SYSTEMMODAL);
+            g_alert_flag = false;
+        }
         win32_process_input(window, &state);
         ImGuiIO& io = ImGui::GetIO();
         io.DisplaySize = ImVec2((float)width, (float)height);
@@ -465,6 +519,8 @@ int CALLBACK WinMain(
         timer_step_and_render(&state);
         ImGui::Render();
         SwapBuffers(GetDC(window));
+        // Sleep for a while
+        Sleep(30);
     }
 
     return TRUE;

@@ -1,6 +1,5 @@
 #pragma once
 
-static HGLRC g_glcontext_handle;
 static GLuint g_imgui_program;
 static GLuint g_imgui_vbo;
 static size_t g_imgui_vbo_size;
