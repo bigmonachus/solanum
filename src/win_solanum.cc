@@ -1,16 +1,7 @@
-#pragma warning(push, 0)
-#include <windows.h>
+#include "system_includes.h"
+#include "imgui_helpers.h"
 
-// Platform independent includes:
-#include <stdint.h>
-#include <stdio.h>  sprintf_s
-
-// Local includes
-#define GLEW_STATIC
-#include <GL/glew.h>
-#include <GL/wglew.h>
-#include <imgui/imgui.h>
-#pragma warning(pop)
+#include "solanum.h"
 
 typedef int32_t bool32;
 typedef int32_t int32;
@@ -18,7 +9,8 @@ typedef uint32_t uint32;
 typedef int64_t int64;
 typedef uint64_t uint64;
 
-#include "imgui_helpers.h"
+static TimerState g_timer_state;
+bool g_running = true;
 
 #define GLCHK(stmt) stmt; gl_query_error(#stmt, __FILE__, __LINE__)
 inline void gl_query_error(const char* expr, const char* file, int line)
@@ -146,7 +138,7 @@ static void win32_setup_context(HWND window, HGLRC* context)
     if (!succeeded)
     {
         OutputDebugStringA("Could not set pixel format\n");
-        PostQuitMessage(0);
+        g_running = false;
         return;
     }
 
@@ -154,14 +146,14 @@ static void win32_setup_context(HWND window, HGLRC* context)
     if (!dummy_context)
     {
         OutputDebugStringA("Could not create GL context. Exiting");
-        PostQuitMessage(0);
+        g_running = false;
         return;
     }
     wglMakeCurrent(GetDC(window), dummy_context);
     if (!succeeded)
     {
         OutputDebugStringA("Could not set current GL context. Exiting");
-        PostQuitMessage(0);
+        g_running = false;
         return;
     }
 
@@ -169,7 +161,7 @@ static void win32_setup_context(HWND window, HGLRC* context)
     if (glew_result != GLEW_OK)
     {
         OutputDebugStringA("Could not init glew.\n");
-        PostQuitMessage(0);
+        g_running = false;
         return;
     }
     const int pixel_attribs[] =
@@ -189,7 +181,7 @@ static void win32_setup_context(HWND window, HGLRC* context)
     if (!num_formats)
     {
         OutputDebugStringA("Could not choose pixel format. Exiting.");
-        PostQuitMessage(0);
+        g_running = false;
         return;
     }
 
@@ -204,7 +196,7 @@ static void win32_setup_context(HWND window, HGLRC* context)
     if (!succeeded)
     {
         OutputDebugStringA("Could not set pixel format for final rendering context.\n");
-        PostQuitMessage(0);
+        g_running = false;
         return;
     }
 
@@ -218,6 +210,55 @@ static void win32_setup_context(HWND window, HGLRC* context)
     *context = wglCreateContextAttribsARB(GetDC(window), 0/*shareContext*/,
             context_attribs);
     wglMakeCurrent(GetDC(window), *context);
+}
+
+static void win32_process_input(HWND window, TimerState* state)
+{
+    MSG message;
+    while (PeekMessage(&message, NULL, 0, 0, PM_REMOVE))
+    {
+        if (message.message == WM_QUIT)
+        {
+            g_running = false;
+        }
+        switch (message.message)
+        {
+        case WM_LBUTTONDOWN:
+            {
+                // FIXME: clicks that last less than one frame will be missed.
+                ImGuiIO& io = ImGui::GetIO();
+                io.MouseDown[0] = true;
+                break;
+            }
+        case WM_LBUTTONUP:
+            {
+                ImGuiIO& io = ImGui::GetIO();
+                io.MouseDown[0] = false;
+                break;
+            }
+        case WM_SYSKEYUP:
+        case WM_SYSKEYDOWN:
+        case WM_KEYUP:
+        case WM_KEYDOWN:
+            {
+                uint32 vkcode = (uint32)message.wParam;
+                bool32 was_down = ((message.lParam & (1 << 30)) != 0);
+                bool32 is_down  = ((message.lParam & (1 << 31)) == 0);
+                bool32 alt_key_was_down = (message.lParam & (1 << 29));
+                if (was_down && vkcode == VK_ESCAPE)
+                {
+                    g_running = false;
+                }
+            }
+        default:
+            {
+                TranslateMessage(&message);
+                DispatchMessage(&message);
+                break;
+            }
+        }
+
+    }
 }
 
 LRESULT APIENTRY WndProc(
@@ -281,7 +322,7 @@ LRESULT APIENTRY WndProc(
                 g_imgui_vbo_size = 2048;  // We will stretch it later, probably.
                 GLCHK(glGenBuffers(1, &g_imgui_vbo));
                 glBindBuffer(GL_ARRAY_BUFFER, g_imgui_vbo);
-                GLCHK(glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)g_imgui_vbo_size, NULL, GL_DYNAMIC_DRAW));
+                glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)g_imgui_vbo_size, NULL, GL_DYNAMIC_DRAW);
 
                 GLCHK(glGenVertexArrays(1, &g_imgui_vao));
                 glBindVertexArray(g_imgui_vao);
@@ -290,9 +331,13 @@ LRESULT APIENTRY WndProc(
                 glEnableVertexAttribArray((GLuint)uv_location);
                 GLCHK(glEnableVertexAttribArray((GLuint)color_location));
 
-                glVertexAttribPointer((GLuint)position_location, 2, GL_FLOAT, GL_FALSE, sizeof(ImDrawVert), (GLvoid*)offsetof(ImDrawVert, pos));
-                glVertexAttribPointer((GLuint)uv_location, 2, GL_FLOAT, GL_FALSE, sizeof(ImDrawVert), (GLvoid*)offsetof(ImDrawVert, uv));
-                GLCHK(glVertexAttribPointer((GLuint)color_location, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(ImDrawVert), (GLvoid*)offsetof(ImDrawVert, col)));
+                glVertexAttribPointer((GLuint)position_location, 2,
+                        GL_FLOAT, GL_FALSE, sizeof(ImDrawVert), (GLvoid*)offsetof(ImDrawVert, pos));
+                glVertexAttribPointer((GLuint)uv_location, 2,
+                        GL_FLOAT, GL_FALSE, sizeof(ImDrawVert), (GLvoid*)offsetof(ImDrawVert, uv));
+                GLCHK(glVertexAttribPointer((GLuint)color_location, 4,
+                            GL_UNSIGNED_BYTE, GL_TRUE, sizeof(ImDrawVert),
+                            (GLvoid*)offsetof(ImDrawVert, col)));
                 GLCHK(glBindVertexArray(0));
                 GLCHK(glBindBuffer(GL_ARRAY_BUFFER, 0));
             }
@@ -324,46 +369,28 @@ LRESULT APIENTRY WndProc(
         }
     case WM_DESTROY:
         {
-            PostQuitMessage(0);
-        }
-    case WM_LBUTTONDOWN:
-        {
-            // If a mouse press event came, always pass it as "mouse held this frame", so we don't miss click-release events that are shorter than 1 frame.
-            ImGuiIO& io = ImGui::GetIO();
-            io.MouseDown[0] = true;
-            break;
-        }
-    case WM_LBUTTONUP:
-        {
-            // If a mouse press event came, always pass it as "mouse held this frame", so we don't miss click-release events that are shorter than 1 frame.
-            ImGuiIO& io = ImGui::GetIO();
-            io.MouseDown[0] = false;
-            break;
+            g_running = false;
         }
     case WM_PAINT:
         {
-            glClearColor(0.5f,0.5f,0.5f,0.5);
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-            ImGuiIO& io = ImGui::GetIO();
-            io.DisplaySize = ImVec2(1024.0f, 560.0f);
-            // Set mouse position
-            {
-                POINT mouse;
-                GetCursorPos(&mouse);
-                ScreenToClient(window, &mouse);
-                io.MousePos = ImVec2((float)mouse.x, (float)mouse.y);
-            }
-            ImGui::NewFrame();
-            static int debug_i = 0;
-            char buffer[256];
-            sprintf_s(buffer, 256, "Hello there timer: %d\n", debug_i);
-            ImGui::Text(buffer);
-            ImGui::Render();
-            SwapBuffers(GetDC(window));
-            debug_i++;
+            PAINTSTRUCT paint;
+            HDC device_context = BeginPaint(window, &paint);
+
+            EndPaint(window, &paint);
             break;
         }
 
+#if 0
+    case WM_LBUTTONDOWN:
+    case WM_LBUTTONUP:
+    case WM_SYSKEYUP:
+    case WM_SYSKEYDOWN:
+    case WM_KEYUP:
+    case WM_KEYDOWN:
+        {
+            break;
+        }
+#endif
     default:
         {
             result = DefWindowProc(window, message, wParam, lParam);
@@ -417,13 +444,27 @@ int CALLBACK WinMain(
         return FALSE;
     }
 
-    HDC device_context = GetDC(window);
-
-    MSG message;
-    while(GetMessage(&message, NULL, 0, 0))
+    TimerState state = {};
+    state.window_width = width;
+    state.window_height = height;
+    while (g_running)
     {
-        TranslateMessage(&message);
-        DispatchMessage(&message);
+        win32_process_input(window, &state);
+        ImGuiIO& io = ImGui::GetIO();
+        io.DisplaySize = ImVec2((float)width, (float)height);
+        // Set mouse position
+        {
+            POINT mouse;
+            GetCursorPos(&mouse);
+            ScreenToClient(window, &mouse);
+            io.MousePos = ImVec2((float)mouse.x, (float)mouse.y);
+        }
+        glClearColor(0.5f, 0.5f, 0.5f, 0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		ImGui::NewFrame();
+        timer_step_and_render(&state);
+        ImGui::Render();
+        SwapBuffers(GetDC(window));
     }
 
     return TRUE;
