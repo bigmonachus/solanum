@@ -35,6 +35,25 @@ void platform_save_state(TimerState* state)
     fclose(fd);
 }
 
+void path_at_exe(char* full_path, int buffer_size, char* fname)
+{
+    GetModuleFileName(NULL, full_path, (DWORD)buffer_size);
+    {  // Trim to backslash
+        int len = 0;
+        for(int i = 0; i < buffer_size; ++i)
+        {
+            char c = full_path[i];
+            if (!c)
+                break;
+            if (c == '\\')
+                len = i;
+        }
+        full_path[len + 1] = '\0';
+    }
+
+    strcat(full_path, fname);
+}
+
 #define GLCHK(stmt) stmt; gl_query_error(#stmt, __FILE__, __LINE__)
 inline void gl_query_error(const char* expr, const char* file, int line)
 {
@@ -469,7 +488,8 @@ int CALLBACK WinMain(
             "Solanum",                      // window name
             //WS_CLIPCHILDREN | WS_CLIPSIBLINGS | WS_VISIBLE | WS_POPUP,          // dwStyle
             //WS_OVERLAPPEDWINDOW | WS_VISIBLE,
-            WS_OVERLAPPED | WS_CAPTION | WS_BORDER | WS_VISIBLE | WS_SYSMENU,
+            //WS_OVERLAPPED | WS_CAPTION | WS_BORDER | WS_VISIBLE | WS_SYSMENU,
+            WS_VISIBLE | WS_BORDER | WS_POPUP,
             x,                      // x
             y,                      // y
             width,                  // width
@@ -485,29 +505,29 @@ int CALLBACK WinMain(
         return FALSE;
     }
 
+    char data_path[MAX_PATH];
+    path_at_exe(data_path, MAX_PATH, "solanum.dat");
+
     TimerState state = {};
     {
         state.time_unit_in_s = 60 * 30;
-        state.records_size = 1024;
+        state.records_size = 1024 * 1024;
+        time_t current_time;
+        time(&current_time);
+        state.time_persp = current_time;
         state.records = (TimeRecord*) malloc(state.records_size * sizeof(TimeRecord));
         {
-            FILE* fd = fopen("solanum.dat", "rb");
+
+            FILE* fd = fopen(data_path, "rb");
             if (fd)
             {
                 fread(&state.num_records, (size_t)(sizeof(int64)), 1, fd);
+				if ((size_t)state.num_records > state.records_size)
+				{
+					return FALSE;
+				}
                 fread(state.records, sizeof(TimeRecord), (size_t)state.num_records, fd);
                 fclose(fd);
-            }
-        }
-
-        time_t one_day_ago;
-        time(&one_day_ago);
-        one_day_ago -= 60 * 60 * 24;
-        for (int i = 0; i < state.num_records; ++i)
-        {
-            if (state.records[i].timestamp >= one_day_ago)
-            {
-                state.num_seconds += state.records[i].elapsed;
             }
         }
     }
@@ -521,7 +541,7 @@ int CALLBACK WinMain(
             g_alert_flag = false;
         }
         win32_process_input(window, &state);
-        glClearColor(0.5f, 0.5f, 0.5f, 0);
+        glClearColor(0.0f, 0.0f, 0.0f, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		ImGui::NewFrame();
         timer_step_and_render(&state);

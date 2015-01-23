@@ -38,6 +38,8 @@ struct TimerState
     time_t pause_time;
     int16 pause_elapsed;
     bool32 paused;
+
+    int64 time_persp;  // Point of reference for timer quick report
 };
 
 #define TEXT_BUFFER_SIZE 256
@@ -63,9 +65,48 @@ static void timer_step_and_render(TimerState* state)
 
     if (!state->started)
     {
-        ImGui::Text("Time logged in the past 24 hours:");
-        format_seconds(buffer, "", state->num_seconds);
-        ImGui::Text(buffer + 2);
+        ImGui::Text("Perspective: ");
+        ImGui::SameLine();
+        bool change_persp = false;
+        if (ImGui::Button("Now"))
+        {
+            change_persp = true;
+            state->time_persp = current_time;
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("-1 hour"))
+        {
+            change_persp = true;
+            state->time_persp -= 1 * 60 * 60;
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("-8 hours"))
+        {
+            change_persp = true;
+            state->time_persp -= 8 * 60 * 60;
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("-24 hours"))
+        {
+            change_persp = true;
+            state->time_persp -= 24 * 60 * 60;
+        }
+
+        if (change_persp)
+        {
+            state->num_seconds = 0;
+            for (int i = 0; i < state->num_records; ++i)
+            {
+                if (state->records[i].timestamp >= state->time_persp)
+                {
+                    state->num_seconds += state->records[i].elapsed;
+                }
+            }
+        }
+
+        ImGui::Separator();
+        format_seconds(buffer, "Time logged", state->num_seconds);
+        ImGui::Text(buffer);
         ImGui::Spacing();
         state->is_long = false;
         if (ImGui::Button("Begin (short)"))
@@ -84,6 +125,9 @@ static void timer_step_and_render(TimerState* state)
             state->begin_time = begin_time;
             state->is_long = true;
         }
+
+        ImGui::Separator();
+
         ImGui::SetCursorPosY(size.y - 80);
         if (ImGui::Button("Quit"))
         {
