@@ -42,6 +42,11 @@ struct TimerState
     int64 time_persp;  // Point of reference for timer quick report
 };
 
+static char* hilarious_phrases[] =
+{
+    "Get some shit done!",
+};
+
 #define TEXT_BUFFER_SIZE 256
 static void format_seconds(char* buffer, char* msg, int64 in_seconds)
 {
@@ -183,6 +188,11 @@ static void timer_step_and_render(TimerState* state)
             stopping = true;
             alert_user = true;
         }
+
+        int num_phrases = (int)sizeof(hilarious_phrases) / sizeof(char*);
+        char* phrase = hilarious_phrases[current_time % num_phrases];
+        ImGui::Separator();
+        ImGui::Text(phrase);
 
         if (stopping)
         {

@@ -26,15 +26,6 @@ void platform_alert()
     g_alert_flag = true;
 }
 
-void platform_save_state(TimerState* state)
-{
-    FILE* fd = fopen("solanum.dat", "wb");
-    assert(fd);
-    fwrite(&state->num_records, (size_t)(sizeof(int64)), 1, fd);
-    fwrite(state->records, sizeof(TimeRecord), (size_t)state->num_records, fd);
-    fclose(fd);
-}
-
 void path_at_exe(char* full_path, int buffer_size, char* fname)
 {
     GetModuleFileName(NULL, full_path, (DWORD)buffer_size);
@@ -53,6 +44,33 @@ void path_at_exe(char* full_path, int buffer_size, char* fname)
 
     strcat(full_path, fname);
 }
+
+void platform_save_state(TimerState* state)
+{
+    static int num_backups = 5;
+    static int backup_i = 0;
+
+    char data_path[MAX_PATH];
+    path_at_exe(data_path, MAX_PATH, "solanum.dat");
+    char backup_path[MAX_PATH];
+    char fname[MAX_PATH];
+    sprintf(fname, "BAK%d_solanum.dat", backup_i);
+    path_at_exe(backup_path, MAX_PATH, fname);
+
+    CopyFile(
+            data_path,
+            backup_path,
+            FALSE);
+
+    FILE* fd = fopen(data_path, "wb");
+    assert(fd);
+    fwrite(&state->num_records, (size_t)(sizeof(int64)), 1, fd);
+    fwrite(state->records, sizeof(TimeRecord), (size_t)state->num_records, fd);
+    fclose(fd);
+
+    backup_i = (backup_i + 1) % num_backups;
+}
+
 
 #define GLCHK(stmt) stmt; gl_query_error(#stmt, __FILE__, __LINE__)
 inline void gl_query_error(const char* expr, const char* file, int line)
