@@ -14,7 +14,7 @@ typedef uint64_t uint64;
 #pragma pack(1)
 struct TimeRecord
 {
-	int16 elapsed;
+    int16 elapsed;
     int64 timestamp;
 };
 #pragma pack(pop)

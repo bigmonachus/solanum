@@ -540,10 +540,10 @@ int CALLBACK WinMain(
             if (fd)
             {
                 fread(&state.num_records, (size_t)(sizeof(int64)), 1, fd);
-				if ((size_t)state.num_records > state.records_size)
-				{
-					return FALSE;
-				}
+                if ((size_t)state.num_records > state.records_size)
+                {
+                    return FALSE;
+                }
                 fread(state.records, sizeof(TimeRecord), (size_t)state.num_records, fd);
                 fclose(fd);
             }
@@ -561,7 +561,7 @@ int CALLBACK WinMain(
         win32_process_input(window, &state);
         glClearColor(0.0f, 0.0f, 0.0f, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		ImGui::NewFrame();
+        ImGui::NewFrame();
         timer_step_and_render(&state);
         ImGui::Render();
         SwapBuffers(GetDC(window));
