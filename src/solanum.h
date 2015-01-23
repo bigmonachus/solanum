@@ -19,6 +19,13 @@ struct TimeRecord
 };
 #pragma pack(pop)
 
+enum TimerType
+{
+    TimerType_SHORT,
+    TimerType_LONG,
+    TimerType_ETERNAL
+};
+
 struct TimerState
 {
     int window_width; // This refers to the main imgui window
@@ -28,12 +35,12 @@ struct TimerState
     size_t records_size;
     int64 num_records;
 
-    int64 time_unit_in_s;
+    int16 time_unit_in_s;
     int64 num_seconds;
 
     time_t begin_time;
     bool32 started;
-    bool32 is_long;
+    TimerType timer_type;
 
     time_t pause_time;
     int16 pause_elapsed;
@@ -113,22 +120,32 @@ static void timer_step_and_render(TimerState* state)
         format_seconds(buffer, "Time logged", state->num_seconds);
         ImGui::Text(buffer);
         ImGui::Spacing();
-        state->is_long = false;
+        state->timer_type = TimerType_SHORT;
         if (ImGui::Button("Begin (short)"))
         {
             state->started = true;
             time_t begin_time;
             time(&begin_time);
             state->begin_time = begin_time;
+            state->timer_type = TimerType_SHORT;
         }
-        ImGui::SameLine(0, 30);
+        ImGui::SameLine(0, 20);
         if (ImGui::Button("Begin (long)"))
         {
             state->started = true;
             time_t begin_time;
             time(&begin_time);
             state->begin_time = begin_time;
-            state->is_long = true;
+            state->timer_type = TimerType_LONG;
+        }
+        ImGui::SameLine(0, 20);
+        if (ImGui::Button("Begin (eternal)"))
+        {
+            state->started = true;
+            time_t begin_time;
+            time(&begin_time);
+            state->begin_time = begin_time;
+            state->timer_type = TimerType_ETERNAL;
         }
 
         ImGui::Separator();
@@ -145,7 +162,7 @@ static void timer_step_and_render(TimerState* state)
         int16 elapsed = 0;
         {
             int64 elapsed_64 = current_time - state->begin_time - state->pause_elapsed;
-            if (elapsed_64 <= (1 << 15))
+            if (elapsed_64 <= (1 << 15) - 1)
             {
                 elapsed = (int16) elapsed_64;
             }
@@ -155,9 +172,26 @@ static void timer_step_and_render(TimerState* state)
             }
         }
 
-        //elapsed += 29 * 60 + 0;
-        int16 factor = state->is_long? 2 : 1;
-        int64 time_left = (state->time_unit_in_s * factor) - elapsed;
+        int16 time_unit_length = state->time_unit_in_s;
+        switch(state->timer_type)
+        {
+        case TimerType_SHORT:
+            {
+                time_unit_length *= 1;
+                break;
+            }
+        case TimerType_LONG:
+            {
+                time_unit_length *= 2;
+                break;
+            }
+        case TimerType_ETERNAL:
+            {
+                time_unit_length = (int16)((1 << 15) - 1);
+                break;
+            }
+        }
+        int64 time_left = time_unit_length - elapsed;
 
         format_seconds(buffer, "Time elapsed", elapsed);
         ImGui::Text(buffer);
@@ -203,9 +237,9 @@ static void timer_step_and_render(TimerState* state)
             record.timestamp = current_time;
 
             // This can happen if we leave a timer running and the computer goes to sleep.
-            if (elapsed > (int16)state->time_unit_in_s * factor)
+            if (elapsed > time_unit_length)
             {
-                elapsed = (int16)state->time_unit_in_s * factor;
+                elapsed = time_unit_length;
             }
 
             record.elapsed = elapsed;
