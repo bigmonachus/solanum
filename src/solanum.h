@@ -3,16 +3,21 @@
 #include <time.h>
 
 typedef int32_t bool32;
+typedef int16_t int16;
+typedef uint16_t uint16;
 typedef int32_t int32;
 typedef uint32_t uint32;
 typedef int64_t int64;
 typedef uint64_t uint64;
 
+#pragma pack(push)
+#pragma pack(1)
 struct TimeRecord
 {
+	int16 elapsed;
     int64 timestamp;
-    int64 elapsed;
 };
+#pragma pack(pop)
 
 struct TimerState
 {
@@ -29,31 +34,38 @@ struct TimerState
     time_t begin_time;
     bool32 started;
     bool32 is_long;
+
+    time_t pause_time;
+    int16 pause_elapsed;
+    bool32 paused;
 };
+
+#define TEXT_BUFFER_SIZE 256
+static void format_seconds(char* buffer, char* msg, int64 in_seconds)
+{
+    int64 hours = in_seconds / (60 * 60);
+    int64 minutes = (in_seconds / 60) % 60;
+    int64 seconds = in_seconds % 60;
+    snprintf(buffer, TEXT_BUFFER_SIZE, "%s: %uh %um %us", msg, hours, minutes, seconds);
+}
 
 static void timer_step_and_render(TimerState* state)
 {
-    char buffer[256];
+    char buffer[TEXT_BUFFER_SIZE];
     time_t current_time;
     time(&current_time);
 
-    ImVec2 size = {(float)state->window_width, (float)state->window_height};
+    ImVec2 size = {(float)400, (float)200};
     ImGui::PushStyleColor(ImGuiCol_WindowBg, {0.17f, 0.23f, 0.42f, 0.5});
 
-    ImGui::Begin("", NULL, size);
-    ImGui::SetWindowPos(ImVec2(0,0));
-    ImGui::Text("Solanum. A timer to get shit done.");
-    ImGui::Spacing();
-    ImGui::Separator();
-    ImGui::Spacing();
+    ImGui::Begin("Solanum", NULL, size);
+    ImGui::SetWindowSize(size);
 
     if (!state->started)
     {
-        int64 hours = state->num_seconds / (60 * 60);
-        int64 minutes = state->num_seconds / 60;
-        int64 seconds = state->num_seconds % 60;
-        snprintf(buffer, 256, "Time logged in the past 24 hours: %uh %um %us", hours, minutes, seconds);
-        ImGui::Text(buffer);
+        ImGui::Text("Time logged in the past 24 hours:");
+        format_seconds(buffer, "", state->num_seconds);
+        ImGui::Text(buffer + 2);
         ImGui::Spacing();
         state->is_long = false;
         if (ImGui::Button("Begin (short)"))
@@ -72,7 +84,7 @@ static void timer_step_and_render(TimerState* state)
             state->begin_time = begin_time;
             state->is_long = true;
         }
-        ImGui::SetCursorPosY((float)state->window_height - 40);
+        ImGui::SetCursorPosY(size.y - 80);
         if (ImGui::Button("Quit"))
         {
             platform_quit();
@@ -81,17 +93,46 @@ static void timer_step_and_render(TimerState* state)
 
     if (state->started)
     {
-        int64 elapsed = current_time - state->begin_time;
-        int factor = state->is_long? 2 : 1;
+        int16 elapsed = 0;
+        {
+            int64 elapsed_64 = current_time - state->begin_time - state->pause_elapsed;
+            if (elapsed_64 <= (1 << 15))
+            {
+                elapsed = (int16) elapsed_64;
+            }
+            else
+            {
+                state->started = false;
+            }
+        }
+
+        //elapsed += 29 * 60 + 0;
+        int16 factor = state->is_long? 2 : 1;
         int64 time_left = (state->time_unit_in_s * factor) - elapsed;
 
-        int64 hours = elapsed / (60 * 60);
-        int64 minutes = elapsed / 60;
-        int64 seconds = elapsed % 60;
-        snprintf(buffer, 256, "Time elapsed: %uh %um %us", hours, minutes, seconds);
-
+        format_seconds(buffer, "Time elapsed", elapsed);
         ImGui::Text(buffer);
+
+        if (!state->paused)
+        {
+            if (ImGui::Button("Pause"))
+            {
+                state->pause_time = current_time - state->pause_elapsed;
+                state->paused = true;
+            }
+        }
+        else
+        {
+            state->pause_elapsed = (int16)(current_time - state->pause_time);
+            if (ImGui::Button("Resume"))
+            {
+                state->paused = false;
+            }
+        }
+
+        ImGui::SameLine(0, 30);
         bool32 stopping = ImGui::Button("Stop");
+
         bool32 alert_user = false;
         if (time_left <= 0)
         {
@@ -101,11 +142,20 @@ static void timer_step_and_render(TimerState* state)
 
         if (stopping)
         {
-            state->num_seconds += elapsed;
             state->started = false;
+            state->pause_elapsed = 0;
+            state->paused = false;
             TimeRecord record = {};
             record.timestamp = current_time;
+
+            // This can happen if we leave a timer running and the computer goes to sleep.
+            if (elapsed > (int16)state->time_unit_in_s * factor)
+            {
+                elapsed = (int16)state->time_unit_in_s * factor;
+            }
+
             record.elapsed = elapsed;
+            state->num_seconds += elapsed;
             state->records[state->num_records++] = record;
             if (alert_user)
             {

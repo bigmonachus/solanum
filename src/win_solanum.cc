@@ -311,9 +311,9 @@ LRESULT APIENTRY WndProc(
                     "{\n"
                     "    frag_texcoord = texcoord;\n"
                     "    frag_color = color;\n"
-                    //"    gl_Position = proj * vec4(pos.xy,0,1);\n"
+                    "    gl_Position = proj * vec4(pos.xy,0,1);\n"
                     //"    gl_Position = proj * vec4(pos.xy + vec2(0.375, 0.375),0,1);\n"
-                    "    gl_Position = proj * vec4(pos.xy + vec2(0.5, 0.5),0,1);\n"
+                    //"    gl_Position = proj * vec4(pos.xy + vec2(0.5, 0.5),0,1);\n"
                     "}\n";
 
                 const GLchar* fragment_shader =
@@ -389,7 +389,21 @@ LRESULT APIENTRY WndProc(
 
                 // Store our identifier
                 io.Fonts->TexID = (void *)(intptr_t)tex_id;
+                RECT rect;
+                GetClientRect(window, &rect);
+                int display_w = (int)(rect.right - rect.left);
+                int display_h = (int)(rect.bottom - rect.top);
+
+                io.DisplaySize = ImVec2((float)display_w, (float)display_h);
             }
+            break;
+        }
+    case WM_MOUSEMOVE:
+        {
+            ImGuiIO& io = ImGui::GetIO();
+            // Mouse position, in pixels (set to -1,-1 if no mouse / on another screen, etc.)
+            io.MousePos.x = (signed short)(lParam);
+            io.MousePos.y = (signed short)(lParam >> 16);
             break;
         }
     case WM_DESTROY:
@@ -447,14 +461,15 @@ int CALLBACK WinMain(
 
     int x = 100;
     int y = 100;
-    int width = 400;
-    int height = 500;
+    int width = 1024;
+    int height = 560;
     HWND window = CreateWindowExA(
             0, //WS_EX_TOPMOST ,  // dwExStyle
             window_class.lpszClassName,     // class Name
             "Solanum",                      // window name
             //WS_CLIPCHILDREN | WS_CLIPSIBLINGS | WS_VISIBLE | WS_POPUP,          // dwStyle
-            WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+            //WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+            WS_OVERLAPPED | WS_CAPTION | WS_BORDER | WS_VISIBLE | WS_SYSMENU,
             x,                      // x
             y,                      // y
             width,                  // width
@@ -487,11 +502,13 @@ int CALLBACK WinMain(
 
         time_t one_day_ago;
         time(&one_day_ago);
-        one_day_ago -= 60 * 24;
+        one_day_ago -= 60 * 60 * 24;
         for (int i = 0; i < state.num_records; ++i)
         {
             if (state.records[i].timestamp >= one_day_ago)
+            {
                 state.num_seconds += state.records[i].elapsed;
+            }
         }
     }
     state.window_width = width;
@@ -504,15 +521,6 @@ int CALLBACK WinMain(
             g_alert_flag = false;
         }
         win32_process_input(window, &state);
-        ImGuiIO& io = ImGui::GetIO();
-        io.DisplaySize = ImVec2((float)width, (float)height);
-        // Set mouse position
-        {
-            POINT mouse;
-            GetCursorPos(&mouse);
-            ScreenToClient(window, &mouse);
-            io.MousePos = ImVec2((float)mouse.x, (float)mouse.y);
-        }
         glClearColor(0.5f, 0.5f, 0.5f, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		ImGui::NewFrame();
@@ -520,8 +528,9 @@ int CALLBACK WinMain(
         ImGui::Render();
         SwapBuffers(GetDC(window));
         // Sleep for a while
-        Sleep(30);
+        Sleep(10);
     }
+    platform_save_state(&state);
 
     return TRUE;
 }
