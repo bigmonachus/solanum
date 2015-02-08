@@ -10,6 +10,21 @@ typedef uint32_t uint32;
 typedef int64_t int64;
 typedef uint64_t uint64;
 
+
+enum
+{
+    SOLANUM_NONE = 0,
+    SOLANUM_QUIT = (1 << 1),
+};
+
+int g_solanum_message_queue = SOLANUM_NONE;
+
+void solanum_post_exit()
+{
+    g_solanum_message_queue |= SOLANUM_QUIT;
+    platform_quit();
+}
+
 #pragma pack(push)
 #pragma pack(1)
 struct TimeRecord
@@ -221,6 +236,11 @@ static void timer_step_and_render(TimerState* state)
         {
             stopping = true;
             alert_user = true;
+        }
+
+        if (g_solanum_message_queue & SOLANUM_QUIT)
+        {
+            stopping = true;
         }
 
         int num_phrases = (int)sizeof(hilarious_phrases) / sizeof(char*);

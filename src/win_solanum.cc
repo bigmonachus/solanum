@@ -279,7 +279,7 @@ static void win32_process_input(HWND window, TimerState* state)
     {
         if (message.message == WM_QUIT)
         {
-            g_running = false;
+            solanum_post_exit();
         }
         switch (message.message)
         {
@@ -307,7 +307,7 @@ static void win32_process_input(HWND window, TimerState* state)
                 bool32 alt_key_was_down = (message.lParam & (1 << 29));
                 if (was_down && vkcode == VK_ESCAPE)
                 {
-                    g_running = false;
+                    solanum_post_exit();
                 }
             }
         default:
@@ -445,7 +445,7 @@ LRESULT APIENTRY WndProc(
         }
     case WM_DESTROY:
         {
-            g_running = false;
+            solanum_post_exit();
         }
     case WM_PAINT:
         {
