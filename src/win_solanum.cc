@@ -272,7 +272,7 @@ static void win32_setup_context(HWND window, HGLRC* context)
     wglMakeCurrent(GetDC(window), *context);
 }
 
-static void win32_process_input(HWND window, TimerState* state)
+static void win32_process_input(HWND window)
 {
     MSG message;
     while (PeekMessage(&message, NULL, 0, 0, PM_REMOVE))
@@ -558,7 +558,7 @@ int CALLBACK WinMain(
             MessageBox(window, "Timer done", "Solanum", MB_OK | MB_SYSTEMMODAL);
             g_alert_flag = false;
         }
-        win32_process_input(window, &state);
+        win32_process_input(window);
         glClearColor(0.0f, 0.0f, 0.0f, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         ImGui::NewFrame();
