@@ -87,7 +87,8 @@ static void timer_step_and_render(TimerState* state)
     ImVec2 size = {(float)400, (float)200};
     ImGui::PushStyleColor(ImGuiCol_WindowBg, {0.17f, 0.23f, 0.42f, 0.5});
 
-    ImGui::Begin("Solanum", NULL, size);
+    bool show_solanum = true;
+    ImGui::Begin("Solanum", &show_solanum);
     ImGui::SetWindowSize(size);
 
     if (!state->started)

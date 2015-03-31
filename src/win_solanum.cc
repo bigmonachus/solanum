@@ -506,8 +506,8 @@ int CALLBACK WinMain(
             "Solanum",                      // window name
             //WS_CLIPCHILDREN | WS_CLIPSIBLINGS | WS_VISIBLE | WS_POPUP,          // dwStyle
             //WS_OVERLAPPEDWINDOW | WS_VISIBLE,
-            //WS_OVERLAPPED | WS_CAPTION | WS_BORDER | WS_VISIBLE | WS_SYSMENU,
-            WS_VISIBLE | WS_BORDER | WS_POPUP,
+            WS_OVERLAPPED | WS_CAPTION | WS_BORDER | WS_VISIBLE | WS_SYSMENU,
+            //WS_VISIBLE | WS_BORDER | WS_POPUP,
             x,                      // x
             y,                      // y
             width,                  // width
@@ -565,8 +565,7 @@ int CALLBACK WinMain(
         timer_step_and_render(&state);
         ImGui::Render();
         SwapBuffers(GetDC(window));
-        // Sleep for a while
-        Sleep(10);
+        WaitMessage();
     }
     platform_save_state(&state);
 
