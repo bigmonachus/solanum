@@ -71,7 +71,6 @@ void platform_save_state(TimerState* state)
     backup_i = (backup_i + 1) % num_backups;
 }
 
-
 #define GLCHK(stmt) stmt; gl_query_error(#stmt, __FILE__, __LINE__)
 inline void gl_query_error(const char* expr, const char* file, int line)
 {
@@ -475,6 +474,14 @@ LRESULT APIENTRY WndProc(
     return result;
 }
 
+void CALLBACK win32_fire_timer(HWND window, UINT uMsg, UINT_PTR event_id, DWORD time)
+{
+    if (event_id == 42)
+    {
+        SetTimer(window, 42, 500/*ms*/, win32_fire_timer);
+    }
+}
+
 int CALLBACK WinMain(
         HINSTANCE hInstance,
         HINSTANCE hPrevInstance,
@@ -522,6 +529,8 @@ int CALLBACK WinMain(
     {
         return FALSE;
     }
+
+    SetTimer(window, 42, 10/*ms*/, win32_fire_timer);
 
     char data_path[MAX_PATH];
     path_at_exe(data_path, MAX_PATH, "solanum.dat");
