@@ -289,6 +289,8 @@ static void win32_process_input(HWND window)
                 io.MouseDown[0] = true;
                 break;
             }
+        case WM_MOUSELEAVE:
+            // Fall-through
         case WM_LBUTTONUP:
             {
                 ImGuiIO& io = ImGui::GetIO();
@@ -505,8 +507,8 @@ int CALLBACK WinMain(
 
     int x = 100;
     int y = 100;
-    int width = 1024;
-    int height = 560;
+    int width = 840;
+    int height = 480;
     HWND window = CreateWindowExA(
             0, //WS_EX_TOPMOST ,  // dwExStyle
             window_class.lpszClassName,     // class Name
@@ -568,7 +570,7 @@ int CALLBACK WinMain(
             g_alert_flag = false;
         }
         win32_process_input(window);
-        glClearColor(0.0f, 0.0f, 0.0f, 0);
+        glClearColor(1.0f, 1.0f, 1.0f, 1);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         ImGui::NewFrame();
         timer_step_and_render(&state);
