@@ -507,10 +507,10 @@ int CALLBACK WinMain(
 
     int x = 100;
     int y = 100;
-    int width = 840;
-    int height = 480;
+    int width = 500;
+    int height = 288;
     HWND window = CreateWindowExA(
-            0, //WS_EX_TOPMOST ,  // dwExStyle
+            WS_EX_LAYERED, //WS_EX_TOPMOST ,  // dwExStyle
             window_class.lpszClassName,     // class Name
             "Solanum",                      // window name
             //WS_CLIPCHILDREN | WS_CLIPSIBLINGS | WS_VISIBLE | WS_POPUP,          // dwStyle
@@ -527,9 +527,17 @@ int CALLBACK WinMain(
             0                                   // lpParam
             );
 
+
     if (!window)
     {
         return FALSE;
+    }
+    // Transparency
+    {
+        SetLayeredWindowAttributes(window,
+                                   (COLORREF)0x00ff00ff,
+                                   (DWORD)(255 * 0.90),
+                                   LWA_ALPHA | LWA_COLORKEY);
     }
 
     SetTimer(window, 42, 10/*ms*/, win32_fire_timer);
@@ -570,7 +578,7 @@ int CALLBACK WinMain(
             g_alert_flag = false;
         }
         win32_process_input(window);
-        glClearColor(1.0f, 1.0f, 1.0f, 1);
+        glClearColor(0.0f, 0.0f, 0.0f, 1);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         ImGui::NewFrame();
         timer_step_and_render(&state);

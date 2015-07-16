@@ -85,7 +85,9 @@ static void timer_step_and_render(TimerState* state)
     time(&current_time);
 
     ImVec2 size = {(float)400, (float)200};
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, {0.17f, 0.23f, 0.42f, 1.0f});
+    // Old blue color
+    // ImGui::PushStyleColor(ImGuiCol_WindowBg, {0.17f, 0.23f, 0.42f, 1.0f});
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, {0.23f, 0.23f, 0.23f, 1.0f});
 
     bool show_solanum = true;
     ImGui::Begin("Solanum", &show_solanum);
