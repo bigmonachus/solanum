@@ -3,12 +3,12 @@
 IF NOT EXIST build mkdir build
 
 pushd imgui
-cl -c /wd4577 imgui.cpp
+cl /wd4577 -c imgui.cpp
 lib imgui.obj -OUT:imgui.lib
 popd
 
 :: 4820 is padding warning.
-set common_c_flags=/nologo /GR- /MT /WX /Wall /wd4820 /wd4514 /wd4505 /wd4201 /wd4100 /wd4189 /wd4577 /wd4710 /D_CRT_SECURE_NO_WARNINGS /FC /MP
+set common_c_flags=/nologo /GR- /EHa- /MT /WX /Wall /wd4820 /wd4514 /wd4505 /wd4201 /wd4100 /wd4189 /wd4577 /wd4710 /D_CRT_SECURE_NO_WARNINGS /FC /MP
 
 set common_link_flags=user32.lib gdi32.lib  OpenGL32.lib ..\imgui\imgui.lib ..\third_party\glew32s.lib
 
