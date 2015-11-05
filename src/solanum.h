@@ -64,7 +64,8 @@ struct TimerState
     int64 time_persp;  // Point of reference for timer quick report
 };
 
-static char* hilarious_phrases[] =
+#define MAX_PHRASE_LEN 256
+static char hilarious_phrases[][MAX_PHRASE_LEN] =
 {
     "Get some shit done!",
 };
@@ -84,7 +85,7 @@ static void timer_step_and_render(TimerState* state)
     time_t current_time;
     time(&current_time);
 
-    ImVec2 size = {(float)400, (float)200};
+    ImVec2 size = ImVec2((float)400, (float)200);
     // Old blue color
     // ImGui::PushStyleColor(ImGuiCol_WindowBg, {0.17f, 0.23f, 0.42f, 1.0f});
     ImGui::PushStyleColor(ImGuiCol_WindowBg, {0.23f, 0.23f, 0.23f, 1.0f});
@@ -92,6 +93,7 @@ static void timer_step_and_render(TimerState* state)
     bool show_solanum = true;
     ImGui::Begin("Solanum", &show_solanum);
     ImGui::SetWindowSize(size);
+    ImGui::PopStyleColor();
 
     if (!state->started)
     {
@@ -275,6 +277,7 @@ static void timer_step_and_render(TimerState* state)
             platform_save_state(state);
         }
     }
+
 
     ImGui::End();
     ImGui::Render();
