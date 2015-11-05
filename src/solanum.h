@@ -51,7 +51,7 @@ struct TimerState
     int64 num_records;
 
     int16 time_unit_in_s;
-    int64 num_seconds;
+    int num_seconds;
 
     time_t begin_time;
     bool32 started;
@@ -70,12 +70,12 @@ static char* hilarious_phrases[] =
 };
 
 #define TEXT_BUFFER_SIZE 256
-static void format_seconds(char* buffer, char* msg, int64 in_seconds)
+static void format_seconds(char* buffer, char* msg, int in_seconds)
 {
-    int64 hours = in_seconds / (60 * 60);
-    int64 minutes = (in_seconds / 60) % 60;
-    int64 seconds = in_seconds % 60;
-    snprintf(buffer, TEXT_BUFFER_SIZE, "%s: %uh %um %us", msg, hours, minutes, seconds);
+    int hours = in_seconds / (60 * 60);
+    int minutes = (in_seconds / 60) % 60;
+    int seconds = in_seconds % 60;
+    snprintf(buffer, TEXT_BUFFER_SIZE, "%s: %dh %dm %ds", msg, hours, minutes, seconds);
 }
 
 static void timer_step_and_render(TimerState* state)
