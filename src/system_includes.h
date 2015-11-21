@@ -16,7 +16,7 @@
 #include <string.h>
 #include <stdio.h>
 
-#include <imgui/imgui.h>
+#include <imgui.h>
 
 #ifdef _WIN32
 #pragma warning(pop)
