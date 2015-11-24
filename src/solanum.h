@@ -256,13 +256,15 @@ static void timer_step_and_render(TimerState* state)
         }
         int64 time_left = time_unit_length - elapsed;
 
-        format_seconds(buffer, "Time elapsed", elapsed);
-        ImGui::Text(buffer);
-
+        static time_t current_time_at_pause = 0;
         if (!state->paused)
         {
+            format_seconds(buffer, "Time elapsed", elapsed);
+            ImGui::Text(buffer);
+
             if (ImGui::Button("Pause"))
             {
+                current_time_at_pause = current_time;
                 state->pause_time = current_time - state->pause_elapsed;
                 state->paused = true;
             }
@@ -274,6 +276,9 @@ static void timer_step_and_render(TimerState* state)
             {
                 state->paused = false;
             }
+
+            format_seconds(buffer, "PAUSED for", (int)(current_time - current_time_at_pause));
+            ImGui::Text(buffer);
         }
 
         ImGui::SameLine(0, 30);
