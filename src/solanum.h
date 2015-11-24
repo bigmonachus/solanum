@@ -62,12 +62,15 @@ struct TimerState
     bool32 paused;
 
     int64 time_persp;  // Point of reference for timer quick report
+    char* curr_phrase;
+    char* prev_phrase;
 };
 
-#define MAX_PHRASE_LEN 256
-static char hilarious_phrases[][MAX_PHRASE_LEN] =
+static char* phrases[] =
 {
     "Get some shit done!",
+    "You should be coding.",
+    "\"80%% of life is showing up\" -- Woody Allen",
 };
 
 #define TEXT_BUFFER_SIZE 256
@@ -94,6 +97,17 @@ static void timer_step_and_render(TimerState* state)
     ImGui::Begin("Solanum", &show_solanum);
     ImGui::SetWindowSize(size);
     ImGui::PopStyleColor();
+
+    if (!state->curr_phrase) {
+        int num_phrases = sizeof(phrases) / sizeof(char*);
+        int maxloops = 100;
+        int i = 0;
+        while (!state->prev_phrase || !state->curr_phrase || !strcmp(state->curr_phrase, state->prev_phrase)) {
+            time(&current_time);
+            state->curr_phrase = phrases[current_time % num_phrases];
+            if (!state->prev_phrase || i++ >= maxloops) break;
+        }
+    }
 
     if (!state->started)
     {
@@ -123,7 +137,6 @@ static void timer_step_and_render(TimerState* state)
             change_persp = true;
             state->time_persp -= 24 * 60 * 60;
         }
-
         if (change_persp)
         {
             state->num_seconds = 0;
@@ -169,12 +182,14 @@ static void timer_step_and_render(TimerState* state)
         }
 
         ImGui::Separator();
+        ImGui::Text(state->curr_phrase);
 
         ImGui::SetCursorPosY(size.y - 80);
         if (ImGui::Button("Quit"))
         {
             platform_quit();
         }
+
     }
 
     if (state->started)
@@ -248,13 +263,11 @@ static void timer_step_and_render(TimerState* state)
             stopping = true;
         }
 
-        int num_phrases = (int)sizeof(hilarious_phrases) / sizeof(char*);
-        char* phrase = hilarious_phrases[current_time % num_phrases];
-        ImGui::Separator();
-        ImGui::Text(phrase);
 
         if (stopping)
         {
+            state->prev_phrase = state->curr_phrase;
+            state->curr_phrase = NULL;
             state->started = false;
             state->pause_elapsed = 0;
             state->paused = false;
