@@ -61,6 +61,8 @@ struct TimerState
     int16 pause_elapsed;
     bool32 paused;
 
+    bool32 editing_last_entry;
+
     int64 time_persp;  // Point of reference for timer quick report
     char* curr_phrase;
     char* prev_phrase;
@@ -88,14 +90,13 @@ static void timer_step_and_render(TimerState* state)
     time_t current_time;
     time(&current_time);
 
-    ImVec2 size = ImVec2((float)400, (float)200);
     // Old blue color
     // ImGui::PushStyleColor(ImGuiCol_WindowBg, {0.17f, 0.23f, 0.42f, 1.0f});
     ImGui::PushStyleColor(ImGuiCol_WindowBg, {0.23f, 0.23f, 0.23f, 1.0f});
 
     bool show_solanum = true;
     ImGui::Begin("Solanum", &show_solanum);
-    ImGui::SetWindowSize(size);
+    ImGui::SetWindowSize({400,200});
     ImGui::PopStyleColor();
 
     if (!state->curr_phrase) {
@@ -109,11 +110,49 @@ static void timer_step_and_render(TimerState* state)
         }
     }
 
-    if (!state->started)
-    {
+    bool change_persp = false;
+
+    if (state->editing_last_entry) {
+        bool32 save = false;
+        TimeRecord* record = &state->records[state->num_records-1];
+        ImGui::Text("Seconds logged: %d", record->elapsed);
+        static bool32 delete_open = false;
+        int nv = record->elapsed;
+        if ( ImGui::InputInt("10 min", &nv, 600) ) {
+            if (nv < (1 << 16) && nv > 0) {
+                record->elapsed = (int16)nv;
+            }
+        }
+        format_seconds(buffer, "Entry", nv);
+        ImGui::Text(buffer);
+        if ( ImGui::Button("Delete") ) {
+            delete_open = true;
+        }
+        if ( delete_open ) {
+            ImGui::Text("Are you sure?");
+            if ( ImGui::Button("Don't delete!") ) {
+                state->editing_last_entry = false;
+                delete_open = false;
+                state->editing_last_entry = false;
+            }
+            if ( ImGui::Button("Yes, delete") ) {
+                --state->num_records;
+                save = true;
+                change_persp = true;
+                delete_open = false;
+                state->editing_last_entry = false;
+            }
+        }
+        if ( save ) {
+            platform_save_state(state);
+        }
+        if( ImGui::Button("Finish") ) {
+            state->editing_last_entry = false;
+            change_persp = true;
+        }
+    } else if (!state->started) {
         ImGui::Text("Perspective: ");
         ImGui::SameLine();
-        bool change_persp = false;
         if (ImGui::Button("Now"))
         {
             change_persp = true;
@@ -137,18 +176,6 @@ static void timer_step_and_render(TimerState* state)
             change_persp = true;
             state->time_persp -= 24 * 60 * 60;
         }
-        if (change_persp)
-        {
-            state->num_seconds = 0;
-            for (int i = 0; i < state->num_records; ++i)
-            {
-                if (state->records[i].timestamp >= state->time_persp)
-                {
-                    state->num_seconds += state->records[i].elapsed;
-                }
-            }
-        }
-
         ImGui::Separator();
         format_seconds(buffer, "Time logged", state->num_seconds);
         ImGui::Text(buffer);
@@ -184,16 +211,17 @@ static void timer_step_and_render(TimerState* state)
         ImGui::Separator();
         ImGui::Text(state->curr_phrase);
 
-        ImGui::SetCursorPosY(size.y - 80);
+        ImGui::SetCursorPosY(ImGui::GetWindowSize().y - 80);
         if (ImGui::Button("Quit"))
         {
             platform_quit();
         }
+        ImGui::SameLine(0, 150);
+        if (ImGui::Button("Edit last entry.")) {
+            state->editing_last_entry = true;
+        }
 
-    }
-
-    if (state->started)
-    {
+    } else if (state->started) {
         int16 elapsed = 0;
         {
             int64 elapsed_64 = current_time - state->begin_time - state->pause_elapsed;
@@ -290,6 +318,15 @@ static void timer_step_and_render(TimerState* state)
             platform_save_state(state);
         }
     }
+    if (change_persp) {
+        state->num_seconds = 0;
+        for (int i = 0; i < state->num_records; ++i) {
+            if (state->records[i].timestamp >= state->time_persp) {
+                state->num_seconds += state->records[i].elapsed;
+            }
+        }
+    }
+
 
 
     ImGui::End();
