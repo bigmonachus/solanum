@@ -1,5 +1,4 @@
 #include "system_includes.h"
-
 #ifdef _WIN32
 #include <SDL.h>
 #else
@@ -12,10 +11,14 @@
 #ifndef _WIN32
 #define MAX_PATH 1024
 #include <unistd.h>
-#else
+#elif defined(_WIN32)
 #include <windows.h>
 #endif
 #include <errno.h>
+
+#if defined(__MACH__)
+#include <mach-o/dyld.h>
+#endif
 
 // Platform services:
 void platform_alert();
@@ -58,7 +61,13 @@ void path_at_exe(char* full_path, int buffer_size, char* fname)
     }
 
     strcat(full_path, fname);
-#else
+#elif defined(__MACH__)
+    uint32_t size = 0;
+    _NSGetExecutablePath(full_path, &size);
+    puts(full_path);
+    strcat(full_path, fname);
+    puts(full_path);
+#elif defined(__linux__)
     size_t read = readlink("/proc/self/exe", full_path, buffer_size);
     if (read > 0 && read + 1 < buffer_size)
     {
@@ -202,9 +211,9 @@ int main()
     int width = 500;
     int height = 288;
     // Setup window
-    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-    SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
+    /* SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1); */
+    /* SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24); */
+    /* SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8); */
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
     SDL_DisplayMode current;
@@ -214,12 +223,12 @@ int main()
                                           width, height,
                                           SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
     SDL_GLContext gl_context = SDL_GL_CreateContext(window);
+    if (!gl_context) {
+        printf("Could not generate GL context\n");
+        exit(-1);
+    }
 
-    // Setup ImGui binding
-    ImGui_ImplSDLGL3_Init();
-
-#ifdef _WIN32
-
+    glewExperimental = true;
     GLenum glew_err = glewInit();
 
     if (glew_err != GLEW_OK) {
@@ -242,7 +251,9 @@ int main()
         printf("OpenGL 1.4 not supported.\n");
         exit(EXIT_FAILURE);
     }
-#endif
+
+    // Setup ImGui binding
+    ImGui_ImplSDLGL3_Init();
 
     bool show_test_window = true;
     bool show_another_window = false;

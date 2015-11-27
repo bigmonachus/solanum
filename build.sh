@@ -19,6 +19,7 @@ clang++ \
   ../src/imgui_impl_sdl_gl3.cpp \
   ../imgui/imgui.a \
   -lSDL2 \
+  -lGLEW \
   -framework OpenGL \
   -o solanum
 

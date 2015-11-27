@@ -12,19 +12,6 @@
 #endif
 #include "imgui_impl_sdl_gl3.h"
 
-//#include "gl_helpers.h"
-#if defined(__MACH__)
-#define glCreateShaderObjectARB glCreateShader
-#define glShaderSourceARB glShaderSource
-#define glCompileShaderARB glCompileShader
-#define glGetObjectParameterivARB glGetShaderiv
-#define glGetInfoLogARB glGetShaderInfoLog
-#define glDeleteVertexArrays glDeleteVertexArraysAPPLE
-#define glBindVertexArray glBindVertexArrayAPPLE
-#define glGenVertexArrays glGenVertexArraysAPPLE
-#endif
-
-
 // Data
 static double       g_Time = 0.0f;
 static bool         g_MousePressed[3] = { false, false, false };

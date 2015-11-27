@@ -18,8 +18,8 @@
 
 #ifdef __MACH__
 
-#include <OpenGL/GL.h>
-#include <OpenGL/GLext.h>
+#include <GL/GLEW.h>
+
 
 #endif
 
