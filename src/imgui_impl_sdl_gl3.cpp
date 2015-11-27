@@ -32,7 +32,7 @@ void ImGui_ImplSDLGL3_RenderDrawLists(ImDrawData* draw_data)
     GLint last_texture; glGetIntegerv(GL_TEXTURE_BINDING_2D, &last_texture);
     GLint last_array_buffer; glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &last_array_buffer);
     GLint last_element_array_buffer; glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &last_element_array_buffer);
-    //GLint last_vertex_array; glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &last_vertex_array);
+    GLint last_vertex_array; glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &last_vertex_array);
     GLint last_blend_src; glGetIntegerv(GL_BLEND_SRC, &last_blend_src);
     GLint last_blend_dst; glGetIntegerv(GL_BLEND_DST, &last_blend_dst);
     GLint last_blend_equation_rgb; glGetIntegerv(GL_BLEND_EQUATION_RGB, &last_blend_equation_rgb);
@@ -101,7 +101,7 @@ void ImGui_ImplSDLGL3_RenderDrawLists(ImDrawData* draw_data)
     (glBindTexture(GL_TEXTURE_2D, (GLuint)last_texture));
     (glBindBuffer(GL_ARRAY_BUFFER, (GLuint)last_array_buffer));
     (glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, (GLuint)last_element_array_buffer));
-    //(glBindVertexArray((GLuint)last_vertex_array));
+    (glBindVertexArray((GLuint)last_vertex_array));
     /* (glBlendEquationSeparate(last_blend_equation_rgb, last_blend_equation_alpha)); */
     (glBlendFunc((GLenum)last_blend_src, (GLenum)last_blend_dst));
     if (last_enable_blend) glEnable(GL_BLEND); else glDisable(GL_BLEND);
@@ -189,7 +189,7 @@ bool ImGui_ImplSDLGL3_CreateDeviceObjects()
     GLint last_texture, last_array_buffer, last_vertex_array;
     glGetIntegerv(GL_TEXTURE_BINDING_2D, &last_texture);
     glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &last_array_buffer);
-   // glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &last_vertex_array);
+    glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &last_vertex_array);
 
     const GLchar *vertex_shader =
             "#version 120\n"
