@@ -16,7 +16,15 @@
 #include <string.h>
 #include <stdio.h>
 
+#ifdef __MACH__
+
+#include <OpenGL/GL.h>
+#include <OpenGL/GLext.h>
+
+#endif
+
 #include <imgui.h>
+
 
 #ifdef _WIN32
 #pragma warning(pop)
