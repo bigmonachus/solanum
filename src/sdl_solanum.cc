@@ -1,10 +1,15 @@
 #include "system_includes.h"
-#include <SDL2/SDL.h>
+#include <SDL.h>
 
-#include "imgui_impl_sdl.cpp"
+#include "imgui_impl_sdl_gl3.h"
 
 #include <fcntl.h>
+#ifndef _WIN32
+#define MAX_PATH 1024
 #include <unistd.h>
+#else
+#include <windows.h>
+#endif
 #include <errno.h>
 
 // Platform services:
@@ -15,7 +20,6 @@ void platform_save_state(TimerState* state);
 
 #include "solanum.h"
 
-#define MAX_PATH 1024
 
 static TimerState g_timer_state;
 bool32 g_running = true;
@@ -31,8 +35,25 @@ void platform_alert()
     g_alert_flag = true;
 }
 
-size_t path_at_exe(char* full_path, int buffer_size, char* fname)
+void path_at_exe(char* full_path, int buffer_size, char* fname)
 {
+#if defined(_WIN32)
+    GetModuleFileName(NULL, full_path, (DWORD)buffer_size);
+    {  // Trim to backslash
+        int len = 0;
+        for(int i = 0; i < buffer_size; ++i)
+        {
+            char c = full_path[i];
+            if (!c)
+                break;
+            if (c == '\\')
+                len = i;
+        }
+        full_path[len + 1] = '\0';
+    }
+
+    strcat(full_path, fname);
+#else
     size_t read = readlink("/proc/self/exe", full_path, buffer_size);
     if (read > 0 && read + 1 < buffer_size)
     {
@@ -47,16 +68,19 @@ size_t path_at_exe(char* full_path, int buffer_size, char* fname)
         full_path[last_slash_i + 1] = 0;
 
         strcat(full_path, fname);
-        return read;
     }
-    return -1;
+#endif
 }
 
 int cp(const char *from, const char *to)
 {
+#ifdef _WIN32
+    CopyFile(from, to, FALSE);
+    return 0;
+#else
     int fd_to, fd_from;
     char buf[4096];
-    ssize_t nread;
+    size_t nread;
     int saved_errno;
 
     fd_from = open(from, O_RDONLY);
@@ -70,7 +94,7 @@ int cp(const char *from, const char *to)
     while (nread = read(fd_from, buf, sizeof buf), nread > 0)
     {
         char *out_ptr = buf;
-        ssize_t nwritten;
+        size_t nwritten;
 
         do {
             nwritten = write(fd_to, out_ptr, nread);
@@ -109,6 +133,7 @@ out_error:
 
     errno = saved_errno;
     return -1;
+#endif
 }
 
 void platform_save_state(TimerState* state)
@@ -151,7 +176,16 @@ uint32 timer_callback(Uint32 interval, void *param)
     return(interval);
 }
 
-int main(int, char**)
+#ifdef _WIN32
+int CALLBACK WinMain(
+  HINSTANCE hInstance,
+  HINSTANCE hPrevInstance,
+  LPSTR     lpCmdLine,
+  int       nCmdShow
+)
+#else
+int main()
+#endif
 {
     // Setup SDL
     if (SDL_Init(SDL_INIT_EVERYTHING) != 0)
@@ -170,14 +204,40 @@ int main(int, char**)
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
     SDL_DisplayMode current;
     SDL_GetCurrentDisplayMode(0, &current);
-    SDL_Window *window = SDL_CreateWindow("Solanum",
-                                          SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+    SDL_Window* window = SDL_CreateWindow("Solanum",
+                                          SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
                                           width, height,
-                                          SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE);
-    SDL_GLContext glcontext = SDL_GL_CreateContext(window);
+                                          SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+    SDL_GLContext gl_context = SDL_GL_CreateContext(window);
 
     // Setup ImGui binding
-    ImGui_ImplSdl_Init(window);
+    ImGui_ImplSDLGL3_Init();
+
+#ifdef _WIN32
+
+    GLenum glew_err = glewInit();
+
+    if (glew_err != GLEW_OK) {
+        printf("glewInit failed with error: %s\nExiting.\n",
+                   glewGetErrorString(glew_err));
+        exit(EXIT_FAILURE);
+    }
+
+    if (GLEW_VERSION_1_4) {
+        if ( glewIsSupported("GL_ARB_shader_objects "
+                             "GL_ARB_vertex_program "
+                             "GL_ARB_fragment_program "
+                             "GL_ARB_vertex_buffer_object ") ) {
+            printf("[DEBUG] GL OK.\n");
+        } else {
+            printf("One or more OpenGL extensions are not supported.\n");
+            exit(EXIT_FAILURE);
+        }
+    } else {
+        printf("OpenGL 1.4 not supported.\n");
+        exit(EXIT_FAILURE);
+    }
+#endif
 
     bool show_test_window = true;
     bool show_another_window = false;
@@ -216,6 +276,7 @@ int main(int, char**)
     // Main loop
     while (g_running)
     {
+        ImGuiIO& imgui_io = ImGui::GetIO();
         if (g_alert_flag)
         {
             const SDL_MessageBoxButtonData buttons[] = {
@@ -256,13 +317,29 @@ int main(int, char**)
         SDL_Event event;
         while (SDL_PollEvent(&event))
         {
-            ImGui_ImplSdl_ProcessEvent(&event);
+            //ImGui_ImplSDLGL3_KeyCallback_ProcessEvent(&event);
             if (event.type == SDL_QUIT)
             {
                 g_running = false;
             }
         }
-        ImGui_ImplSdl_NewFrame(window);
+        {
+            int mouse_x;
+            int mouse_y;
+            SDL_GetMouseState(&mouse_x, &mouse_y);
+
+            imgui_io.MousePos = ImVec2((float)mouse_x, (float)mouse_y);
+
+            imgui_io.MouseDown[0] = (bool)(SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_LEFT));
+            imgui_io.MouseDown[1] = (bool)(SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_MIDDLE));
+            imgui_io.MouseDown[2] = (bool)(SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_RIGHT));
+        }
+        int d_w, d_h;
+
+        SDL_GL_GetDrawableSize(window,
+                               &d_w, &d_h);
+        ImGui_ImplSDLGL3_NewFrame(width, height,
+                                  d_w, d_h);
         timer_step_and_render(&state);
         // Rendering
         glViewport(0, 0, (int)ImGui::GetIO().DisplaySize.x, (int)ImGui::GetIO().DisplaySize.y);
@@ -274,8 +351,7 @@ int main(int, char**)
     }
 
     // Cleanup
-    ImGui_ImplSdl_Shutdown();
-    SDL_GL_DeleteContext(glcontext);
+    ImGui_ImplSDLGL3_Shutdown();
     SDL_DestroyWindow(window);
     SDL_Quit();
 

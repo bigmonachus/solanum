@@ -91,13 +91,12 @@ static void timer_step_and_render(TimerState* state)
     time(&current_time);
 
     // Old blue color
-    // ImGui::PushStyleColor(ImGuiCol_WindowBg, {0.17f, 0.23f, 0.42f, 1.0f});
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, {0.23f, 0.23f, 0.23f, 1.0f});
+    int style_stack = 0;
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, {0.23f, 0.23f, 0.23f, 1.0f}); ++style_stack;
 
     bool show_solanum = true;
     ImGui::Begin("Solanum", &show_solanum);
     ImGui::SetWindowSize({400,200});
-    ImGui::PopStyleColor();
 
     if (!state->curr_phrase) {
         int num_phrases = sizeof(phrases) / sizeof(char*);
@@ -335,5 +334,6 @@ static void timer_step_and_render(TimerState* state)
 
 
     ImGui::End();
+    ImGui::PopStyleColor(style_stack);
     ImGui::Render();
 }

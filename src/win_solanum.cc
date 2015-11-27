@@ -1,3 +1,4 @@
+#define GLCHK(stmt) stmt; gl_query_error(#stmt, __FILE__, __LINE__)
 #include "system_includes.h"
 #include "imgui_helpers.h"
 
@@ -71,7 +72,6 @@ void platform_save_state(TimerState* state)
     backup_i = (backup_i + 1) % num_backups;
 }
 
-#define GLCHK(stmt) stmt; gl_query_error(#stmt, __FILE__, __LINE__)
 inline void gl_query_error(const char* expr, const char* file, int line)
 {
     GLenum err = glGetError();
