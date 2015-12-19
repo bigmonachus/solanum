@@ -68,6 +68,16 @@ void path_at_exe(char* full_path, int buffer_size, char* fname)
     strcat(full_path, fname);
     puts(full_path);
 #elif defined(__linux__)
+
+#if 1
+    char* dropbox_path = "/Dropbox/solanum/";
+    full_path[0] = '\0';
+    strcat(full_path, getenv("HOME"));
+    strcat(full_path, dropbox_path);
+    strcat(full_path, fname);
+
+#else  // Actual implementation
+
     size_t read = readlink("/proc/self/exe", full_path, buffer_size);
     if (read > 0 && read + 1 < buffer_size)
     {
@@ -83,6 +93,8 @@ void path_at_exe(char* full_path, int buffer_size, char* fname)
 
         strcat(full_path, fname);
     }
+#endif // if 0
+
 #endif
 }
 

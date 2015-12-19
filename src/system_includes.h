@@ -1,3 +1,14 @@
+#ifdef __MACH__
+
+#include <GL/GLEW.h>
+
+#elif defined(__linux__)
+
+#include <GL/glew.h>
+
+
+#endif
+
 #ifdef _WIN32
 #pragma warning(push, 0)
 #include <windows.h>
@@ -15,13 +26,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-
-#ifdef __MACH__
-
-#include <GL/GLEW.h>
-
-
-#endif
 
 #include <imgui.h>
 
