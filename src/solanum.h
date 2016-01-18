@@ -142,12 +142,13 @@ static void timer_step_and_render(TimerState* state)
                 state->editing_last_entry = false;
             }
         }
-        if ( save ) {
-            platform_save_state(state);
-        }
         if( ImGui::Button("Finish") ) {
             state->editing_last_entry = false;
             change_persp = true;
+            save = true;
+        }
+        if ( save ) {
+            platform_save_state(state);
         }
     } else if (!state->started) {
         ImGui::Text("Perspective: ");
