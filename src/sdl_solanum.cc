@@ -1,6 +1,7 @@
 #include "system_includes.h"
 #ifdef _WIN32
 #include <SDL.h>
+#include <SDL_syswm.h>
 #else
 #include <SDL2/SDL.h>
 #endif
@@ -307,6 +308,15 @@ int main()
         ImGuiIO& imgui_io = ImGui::GetIO();
         if (g_alert_flag)
         {
+            char* title = "Timer Done";
+            char* message = "Timer Done!";
+
+#if defined(_WIN32)
+            MessageBoxA(NULL,
+                        message,
+                        title,
+                        MB_OK | MB_SYSTEMMODAL);
+#else
             const SDL_MessageBoxButtonData buttons[] = {
                 { /* .flags, .buttonid, .text */        0, 0, "Ok" },
                 //{ SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, 1, "ok" },
@@ -327,19 +337,23 @@ int main()
                 }
             };
             const SDL_MessageBoxData messageboxdata = {
-                SDL_MESSAGEBOX_INFORMATION, /* .flags */
+                // Error, so we don't miss it accidentaly
+                SDL_MESSAGEBOX_ERROR, /* .flags */
                 NULL, /* .window */
-                "Timer done", /* .title */
-                "Timer done!", /* .message */
+                title, /* .title */
+                message, /* .message */
                 SDL_arraysize(buttons), /* .numbuttons */
                 buttons, /* .buttons */
                 &colorScheme /* .colorScheme */
             };
+
             int buttonid;
+
             if (SDL_ShowMessageBox(&messageboxdata, &buttonid) < 0) {
                 SDL_Log("error displaying message box");
                 return 1;
             }
+#endif
             g_alert_flag = false;
         }
         SDL_Event event;
