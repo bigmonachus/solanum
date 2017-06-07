@@ -1,6 +1,7 @@
 #pragma once
 
 #include <time.h>
+#include <stdio.h>
 
 typedef int32_t bool32;
 typedef int16_t int16;
@@ -10,6 +11,9 @@ typedef uint32_t uint32;
 typedef int64_t int64;
 typedef uint64_t uint64;
 
+#if defined(_WIN32)
+#define snprintf _snprintf
+#endif
 
 enum
 {

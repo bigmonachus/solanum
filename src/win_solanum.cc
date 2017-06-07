@@ -2,7 +2,7 @@
 #include "system_includes.h"
 #include "imgui_helpers.h"
 
-#define snprintf sprintf_s
+// #define snprintf sprintf_s
 
 // Platform services:
 void platform_alert();
