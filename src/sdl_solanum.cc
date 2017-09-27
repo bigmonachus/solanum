@@ -34,18 +34,18 @@ static TimerState g_timer_state;
 bool32 g_running = true;
 bool32 g_alert_flag;
 
-void platform_quit()
-{
+void 
+platform_quit() {
     g_running = false;
 }
 
-void platform_alert()
-{
+void 
+platform_alert() {
     g_alert_flag = true;
 }
 
-void path_at_exe(char* full_path, int buffer_size, char* fname)
-{
+void 
+path_at_exe(char* full_path, int buffer_size, char* fname) {
 #if defined(_WIN32)
     GetModuleFileName(NULL, full_path, (DWORD)buffer_size);
     {  // Trim to backslash
@@ -99,8 +99,8 @@ void path_at_exe(char* full_path, int buffer_size, char* fname)
 #endif
 }
 
-int cp(const char *from, const char *to)
-{
+int 
+cp(const char *from, const char *to) {
 #ifdef _WIN32
     CopyFile(from, to, FALSE);
     return 0;
@@ -163,8 +163,8 @@ out_error:
 #endif
 }
 
-void platform_save_state(TimerState* state)
-{
+void 
+platform_save_state(TimerState* state) {
     static int num_backups = 5;
     static int backup_i = 0;
 
@@ -186,8 +186,8 @@ void platform_save_state(TimerState* state)
     backup_i = (backup_i + 1) % num_backups;
 }
 
-uint32 timer_callback(Uint32 interval, void *param)
-{
+uint32 
+timer_callback(Uint32 interval, void *param) {
     SDL_Event event;
     SDL_UserEvent userevent;
 
@@ -204,12 +204,11 @@ uint32 timer_callback(Uint32 interval, void *param)
 }
 
 #ifdef _WIN32
-int CALLBACK WinMain(
-  HINSTANCE hInstance,
-  HINSTANCE hPrevInstance,
-  LPSTR     lpCmdLine,
-  int       nCmdShow
-)
+int CALLBACK 
+WinMain(HINSTANCE hInstance,
+      HINSTANCE hPrevInstance,
+      LPSTR     lpCmdLine,
+      int       nCmdShow )
 #else
 int main()
 #endif
@@ -277,20 +276,16 @@ int main()
 
     TimerState state = {};
     {
-        state.time_unit_in_s = 60 * 30;
-        state.records_size = 1024 * 1024;
+        state.records_size = 1024 * 1024;  // About 50 years of 25min pomodoros...
         time_t current_time;
         time(&current_time);
         state.time_persp = current_time;
         state.records = (TimeRecord*) malloc(state.records_size * sizeof(TimeRecord));
-        {
-
+        if (state.records) {
             FILE* fd = fopen(data_path, "rb");
-            if (fd)
-            {
+            if (fd) {
                 fread(&state.num_records, (size_t)(sizeof(int64)), 1, fd);
-                if ((size_t)state.num_records > state.records_size)
-                {
+                if ((size_t)state.num_records > state.records_size) {
                     return EXIT_FAILURE;
                 }
                 fread(state.records, sizeof(TimeRecord), (size_t)state.num_records, fd);
@@ -303,11 +298,9 @@ int main()
 
 
     // Main loop
-    while (g_running)
-    {
+    while (g_running) {
         ImGuiIO& imgui_io = ImGui::GetIO();
-        if (g_alert_flag)
-        {
+        if (g_alert_flag) {
             char* title = "Timer Done";
             char* message = "Timer Done!";
 
@@ -357,11 +350,9 @@ int main()
             g_alert_flag = false;
         }
         SDL_Event event;
-        while (SDL_PollEvent(&event))
-        {
+        while (SDL_PollEvent(&event)) {
             //ImGui_ImplSDLGL3_KeyCallback_ProcessEvent(&event);
-            if (event.type == SDL_QUIT)
-            {
+            if (event.type == SDL_QUIT) {
                 g_running = false;
             }
         }

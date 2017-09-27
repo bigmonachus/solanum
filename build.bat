@@ -14,5 +14,5 @@ set common_link_flags=user32.lib gdi32.lib  OpenGL32.lib ..\imgui\imgui.lib ..\t
 
 pushd build
 ::cl %common_c_flags% /Od /Oi /Zi /I..\imgui /I..\third_party ..\src\win_solanum.cc /link %common_link_flags%
-cl %common_c_flags% /O2 /Oi /Zi /I..\imgui /I..\third_party /I..\..\SDL2-2.0.5\include ..\src\sdl_solanum.cc ..\src\imgui_impl_sdl_gl3.cpp /link %common_link_flags% ..\..\SDL2-2.0.5\lib\x64\SDL2.lib
+cl %common_c_flags% /O2 /Oi /Zi /I..\imgui /I..\third_party /I..\SDL2-2.0.6\include ..\src\sdl_solanum.cc ..\src\imgui_impl_sdl_gl3.cpp /link %common_link_flags% ..\SDL2-2.0.6\lib\x64\SDL2.lib
 popd

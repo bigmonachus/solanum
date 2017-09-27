@@ -11,42 +11,41 @@ typedef uint32_t uint32;
 typedef int64_t int64;
 typedef uint64_t uint64;
 
+
+#define MINUTES(sec) (60*(sec))
+
 #if defined(_WIN32)
 #define snprintf _snprintf
 #endif
 
-enum
-{
+enum {
     SOLANUM_NONE = 0,
     SOLANUM_QUIT = (1 << 1),
 };
 
 int g_solanum_message_queue = SOLANUM_NONE;
 
-void solanum_post_exit()
-{
+void 
+solanum_post_exit() {
     g_solanum_message_queue |= SOLANUM_QUIT;
     platform_quit();
 }
 
 #pragma pack(push)
 #pragma pack(1)
-struct TimeRecord
-{
+struct TimeRecord {
     int16 elapsed;
     int64 timestamp;
 };
 #pragma pack(pop)
 
-enum TimerType
-{
-    TimerType_SHORT,
-    TimerType_LONG,
-    TimerType_ETERNAL
+enum TimerType {
+    TimerType_POMODORO,
+    TimerType_SHORT_BREAK,
+    TimerType_LONG_BREAK,
 };
 
-struct TimerState
-{
+struct TimerState {
     int window_width; // This refers to the main imgui window
     int window_height;
 
@@ -54,8 +53,9 @@ struct TimerState
     size_t records_size;
     int64 num_records;
 
-    int16 time_unit_in_s;
     int num_seconds;
+
+    int num_pomodoros;
 
     time_t begin_time;
     bool32 started;
@@ -72,24 +72,21 @@ struct TimerState
     char* prev_phrase;
 };
 
-static char* phrases[] =
-{
-    "Get some shit done!",
-    "You should be coding.",
-    "\"80%% of life is showing up\" -- Woody Allen",
+static char* phrases[] = {
+    "",
 };
 
 #define TEXT_BUFFER_SIZE 256
-static void format_seconds(char* buffer, char* msg, int in_seconds)
-{
+static void 
+format_seconds(char* buffer, char* msg, int in_seconds) {
     int hours = in_seconds / (60 * 60);
     int minutes = (in_seconds / 60) % 60;
     int seconds = in_seconds % 60;
     snprintf(buffer, TEXT_BUFFER_SIZE, "%s: %dh %dm %ds", msg, hours, minutes, seconds);
 }
 
-static void timer_step_and_render(TimerState* state)
-{
+static void 
+timer_step_and_render(TimerState* state) {
     char buffer[TEXT_BUFFER_SIZE];
     time_t current_time;
     time(&current_time);
@@ -154,7 +151,8 @@ static void timer_step_and_render(TimerState* state)
         if ( save ) {
             platform_save_state(state);
         }
-    } else if (!state->started) {
+    } 
+    else if (!state->started) {
         ImGui::Text("Perspective: ");
         ImGui::SameLine();
         if (ImGui::Button("Now"))
@@ -184,40 +182,42 @@ static void timer_step_and_render(TimerState* state)
         format_seconds(buffer, "Time logged", state->num_seconds);
         ImGui::Text(buffer);
         ImGui::Spacing();
-        state->timer_type = TimerType_SHORT;
-        if (ImGui::Button("Begin (short)"))
-        {
+        state->timer_type = TimerType_POMODORO;
+        if (ImGui::Button("Pomodoro")) {
             state->started = true;
             time_t begin_time;
             time(&begin_time);
             state->begin_time = begin_time;
-            state->timer_type = TimerType_SHORT;
+            state->timer_type = TimerType_POMODORO;
         }
         ImGui::SameLine(0, 20);
-        if (ImGui::Button("Begin (long)"))
-        {
+        if (ImGui::Button("Short break")) {
             state->started = true;
             time_t begin_time;
             time(&begin_time);
             state->begin_time = begin_time;
-            state->timer_type = TimerType_LONG;
+            state->timer_type = TimerType_SHORT_BREAK;
         }
         ImGui::SameLine(0, 20);
-        if (ImGui::Button("Begin (eternal)"))
-        {
+        if (ImGui::Button("Long break")) {
             state->started = true;
             time_t begin_time;
             time(&begin_time);
             state->begin_time = begin_time;
-            state->timer_type = TimerType_ETERNAL;
+            state->timer_type = TimerType_LONG_BREAK;
         }
 
         ImGui::Separator();
+        char message[256] = {0};
+        snprintf(message, 256, "Number of pomodoros: %d", state->num_pomodoros);
+        ImGui::Text(message);
+        if (state->num_pomodoros > 0 && state->num_pomodoros % 4 == 0) {
+            ImGui::Text("Time to take a long break!");
+        }
         ImGui::Text(state->curr_phrase);
 
-        ImGui::SetCursorPosY(ImGui::GetWindowSize().y - 80);
-        if (ImGui::Button("Quit"))
-        {
+        ImGui::SetCursorPosY(ImGui::GetWindowSize().y - 40);
+        if (ImGui::Button("Quit")) {
             platform_quit();
         }
         ImGui::SameLine(0, 150);
@@ -225,44 +225,36 @@ static void timer_step_and_render(TimerState* state)
             state->editing_last_entry = true;
         }
 
-    } else if (state->started) {
+    } 
+    else if (state->started) {
         int16 elapsed = 0;
         {
             int64 elapsed_64 = current_time - state->begin_time - state->pause_elapsed;
-            if (elapsed_64 <= (1 << 15) - 1)
-            {
+            if (elapsed_64 <= (1 << 15) - 1) {
                 elapsed = (int16) elapsed_64;
             }
-            else
-            {
+            else {
                 state->started = false;
             }
         }
 
-        int16 time_unit_length = state->time_unit_in_s;
-        switch(state->timer_type)
-        {
-        case TimerType_SHORT:
-            {
-                time_unit_length *= 1;
-                break;
-            }
-        case TimerType_LONG:
-            {
-                time_unit_length *= 2;
-                break;
-            }
-        case TimerType_ETERNAL:
-            {
-                time_unit_length = (int16)((1 << 15) - 1);
-                break;
-            }
+        int16 time_unit_length = 0;
+        switch(state->timer_type) {
+            case TimerType_POMODORO: {
+                time_unit_length = MINUTES(25);
+                time_unit_length = 3;
+            } break;
+            case TimerType_SHORT_BREAK: {
+                time_unit_length = MINUTES(5);
+            } break;
+            case TimerType_LONG_BREAK: {
+                time_unit_length = MINUTES(30);
+            } break;
         }
         int64 time_left = time_unit_length - elapsed;
 
         static time_t current_time_at_pause = 0;
-        if (!state->paused)
-        {
+        if (!state->paused) {
             format_seconds(buffer, "Time elapsed", elapsed);
             ImGui::Text(buffer);
 
@@ -273,11 +265,9 @@ static void timer_step_and_render(TimerState* state)
                 state->paused = true;
             }
         }
-        else
-        {
+        else {
             state->pause_elapsed = (int16)(current_time - state->pause_time);
-            if (ImGui::Button("Resume"))
-            {
+            if (ImGui::Button("Resume")) {
                 state->paused = false;
             }
 
@@ -289,20 +279,18 @@ static void timer_step_and_render(TimerState* state)
         bool32 stopping = ImGui::Button("Stop");
 
         bool32 alert_user = false;
-        if (time_left <= 0)
-        {
+        if (time_left <= 0) {
             stopping = true;
             alert_user = true;
+            ++state->num_pomodoros;
         }
 
-        if (g_solanum_message_queue & SOLANUM_QUIT)
-        {
+        if (g_solanum_message_queue & SOLANUM_QUIT) {
             stopping = true;
         }
 
 
-        if (stopping)
-        {
+        if (stopping) {
             state->prev_phrase = state->curr_phrase;
             state->curr_phrase = NULL;
             state->started = false;
@@ -312,8 +300,7 @@ static void timer_step_and_render(TimerState* state)
             record.timestamp = current_time;
 
             // This can happen if we leave a timer running and the computer goes to sleep.
-            if (elapsed > time_unit_length)
-            {
+            if (elapsed > time_unit_length) {
                 elapsed = time_unit_length;
             }
 
