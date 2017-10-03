@@ -25,7 +25,7 @@ enum {
 
 int g_solanum_message_queue = SOLANUM_NONE;
 
-void 
+void
 solanum_post_exit() {
     g_solanum_message_queue |= SOLANUM_QUIT;
     platform_quit();
@@ -77,7 +77,7 @@ static char* phrases[] = {
 };
 
 #define TEXT_BUFFER_SIZE 256
-static void 
+static void
 format_seconds(char* buffer, char* msg, int in_seconds) {
     int hours = in_seconds / (60 * 60);
     int minutes = (in_seconds / 60) % 60;
@@ -85,7 +85,7 @@ format_seconds(char* buffer, char* msg, int in_seconds) {
     snprintf(buffer, TEXT_BUFFER_SIZE, "%s: %dh %dm %ds", msg, hours, minutes, seconds);
 }
 
-static void 
+static void
 timer_step_and_render(TimerState* state) {
     char buffer[TEXT_BUFFER_SIZE];
     time_t current_time;
@@ -151,7 +151,7 @@ timer_step_and_render(TimerState* state) {
         if ( save ) {
             platform_save_state(state);
         }
-    } 
+    }
     else if (!state->started) {
         ImGui::Text("Perspective: ");
         ImGui::SameLine();
@@ -225,7 +225,7 @@ timer_step_and_render(TimerState* state) {
             state->editing_last_entry = true;
         }
 
-    } 
+    }
     else if (state->started) {
         int16 elapsed = 0;
         {
@@ -242,7 +242,6 @@ timer_step_and_render(TimerState* state) {
         switch(state->timer_type) {
             case TimerType_POMODORO: {
                 time_unit_length = MINUTES(25);
-                time_unit_length = 3;
             } break;
             case TimerType_SHORT_BREAK: {
                 time_unit_length = MINUTES(5);
@@ -282,7 +281,9 @@ timer_step_and_render(TimerState* state) {
         if (time_left <= 0) {
             stopping = true;
             alert_user = true;
-            ++state->num_pomodoros;
+            if (state->timer_type == TimerType_POMODORO){
+               ++state->num_pomodoros;
+            }
         }
 
         if (g_solanum_message_queue & SOLANUM_QUIT) {
